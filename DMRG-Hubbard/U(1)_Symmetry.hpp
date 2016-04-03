@@ -6,6 +6,7 @@
 //  Copyright © 2016 Andrew Shen. All rights reserved.
 //
 
+
 #ifndef U_1__Symmetry_hpp
 #define U_1__Symmetry_hpp
 
