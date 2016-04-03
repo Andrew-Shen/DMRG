@@ -8,10 +8,10 @@
 
 /* Begin PBXBuildFile section */
 		50A2974D1CA963000060D68B /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 50A2974C1CA963000060D68B /* main.cpp */; };
-		50A297591CA963710060D68B /* Class_DMRGBlock.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 50A297531CA963710060D68B /* Class_DMRGBlock.cpp */; settings = {ASSET_TAGS = (); }; };
-		50A2975A1CA963710060D68B /* Class_DMRGSystem.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 50A297551CA963710060D68B /* Class_DMRGSystem.cpp */; settings = {ASSET_TAGS = (); }; };
-		50A2975B1CA963710060D68B /* Lanczos.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 50A297571CA963710060D68B /* Lanczos.cpp */; settings = {ASSET_TAGS = (); }; };
-		50A2975E1CAC03050060D68B /* U(1)_Symmetry.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 50A2975C1CAC03050060D68B /* U(1)_Symmetry.cpp */; settings = {ASSET_TAGS = (); }; };
+		50A297591CA963710060D68B /* Class_DMRGBlock.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 50A297531CA963710060D68B /* Class_DMRGBlock.cpp */; };
+		50A2975A1CA963710060D68B /* Class_DMRGSystem.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 50A297551CA963710060D68B /* Class_DMRGSystem.cpp */; };
+		50A2975B1CA963710060D68B /* Lanczos.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 50A297571CA963710060D68B /* Lanczos.cpp */; };
+		50A2975E1CAC03050060D68B /* U(1)_Symmetry.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 50A2975C1CAC03050060D68B /* U(1)_Symmetry.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -27,7 +27,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		50A297491CA963000060D68B /* DMRG-Hubbard-v2 */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "DMRG-Hubbard-v2"; sourceTree = BUILT_PRODUCTS_DIR; };
+		50A297491CA963000060D68B /* DMRG_Hubbard */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = DMRG_Hubbard; sourceTree = BUILT_PRODUCTS_DIR; };
 		50A2974C1CA963000060D68B /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		50A297531CA963710060D68B /* Class_DMRGBlock.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Class_DMRGBlock.cpp; sourceTree = "<group>"; };
 		50A297541CA963710060D68B /* Class_DMRGBlock.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = Class_DMRGBlock.hpp; sourceTree = "<group>"; };
@@ -61,7 +61,7 @@
 		50A2974A1CA963000060D68B /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				50A297491CA963000060D68B /* DMRG-Hubbard-v2 */,
+				50A297491CA963000060D68B /* DMRG_Hubbard */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -85,9 +85,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		50A297481CA963000060D68B /* DMRG-Hubbard-v2 */ = {
+		50A297481CA963000060D68B /* DMRG_Hubbard */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 50A297501CA963000060D68B /* Build configuration list for PBXNativeTarget "DMRG-Hubbard-v2" */;
+			buildConfigurationList = 50A297501CA963000060D68B /* Build configuration list for PBXNativeTarget "DMRG_Hubbard" */;
 			buildPhases = (
 				50A297451CA963000060D68B /* Sources */,
 				50A297461CA963000060D68B /* Frameworks */,
@@ -97,9 +97,9 @@
 			);
 			dependencies = (
 			);
-			name = "DMRG-Hubbard-v2";
+			name = DMRG_Hubbard;
 			productName = "DMRG-Hubbard";
-			productReference = 50A297491CA963000060D68B /* DMRG-Hubbard-v2 */;
+			productReference = 50A297491CA963000060D68B /* DMRG_Hubbard */;
 			productType = "com.apple.product-type.tool";
 		};
 /* End PBXNativeTarget section */
@@ -116,7 +116,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 50A297441CA963000060D68B /* Build configuration list for PBXProject "DMRG-Hubbard-v2" */;
+			buildConfigurationList = 50A297441CA963000060D68B /* Build configuration list for PBXProject "DMRG_Hubbard" */;
 			compatibilityVersion = "Xcode 3.2";
 			developmentRegion = English;
 			hasScannedForEncodings = 0;
@@ -128,7 +128,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				50A297481CA963000060D68B /* DMRG-Hubbard-v2 */,
+				50A297481CA963000060D68B /* DMRG_Hubbard */,
 			);
 		};
 /* End PBXProject section */
@@ -230,9 +230,12 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				GCC_OPTIMIZATION_LEVEL = 3;
-				HEADER_SEARCH_PATHS = /usr/local/include/;
+				HEADER_SEARCH_PATHS = (
+					/usr/local/include/,
+					../Eigen/,
+				);
 				LIBRARY_SEARCH_PATHS = "";
-				PRODUCT_NAME = "DMRG-Hubbard-v2";
+				PRODUCT_NAME = DMRG_Hubbard;
 			};
 			name = Debug;
 		};
@@ -240,16 +243,19 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				GCC_OPTIMIZATION_LEVEL = 3;
-				HEADER_SEARCH_PATHS = /usr/local/include/;
+				HEADER_SEARCH_PATHS = (
+					/usr/local/include/,
+					../Eigen/,
+				);
 				LIBRARY_SEARCH_PATHS = "";
-				PRODUCT_NAME = "DMRG-Hubbard-v2";
+				PRODUCT_NAME = DMRG_Hubbard;
 			};
 			name = Release;
 		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		50A297441CA963000060D68B /* Build configuration list for PBXProject "DMRG-Hubbard-v2" */ = {
+		50A297441CA963000060D68B /* Build configuration list for PBXProject "DMRG_Hubbard" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				50A2974E1CA963000060D68B /* Debug */,
@@ -258,7 +264,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		50A297501CA963000060D68B /* Build configuration list for PBXNativeTarget "DMRG-Hubbard-v2" */ = {
+		50A297501CA963000060D68B /* Build configuration list for PBXNativeTarget "DMRG_Hubbard" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				50A297511CA963000060D68B /* Debug */,

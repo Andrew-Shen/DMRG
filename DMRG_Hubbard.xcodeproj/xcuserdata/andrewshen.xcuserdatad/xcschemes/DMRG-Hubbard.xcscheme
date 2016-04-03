@@ -15,9 +15,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "50A297481CA963000060D68B"
-               BuildableName = "DMRG-Hubbard-v2"
-               BlueprintName = "DMRG-Hubbard-v2"
-               ReferencedContainer = "container:DMRG-Hubbard-v2.xcodeproj">
+               BuildableName = "DMRG_Hubbard"
+               BlueprintName = "DMRG_Hubbard"
+               ReferencedContainer = "container:DMRG_Hubbard.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -33,9 +33,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "50A297481CA963000060D68B"
-            BuildableName = "DMRG-Hubbard-v2"
-            BlueprintName = "DMRG-Hubbard-v2"
-            ReferencedContainer = "container:DMRG-Hubbard-v2.xcodeproj">
+            BuildableName = "DMRG_Hubbard"
+            BlueprintName = "DMRG_Hubbard"
+            ReferencedContainer = "container:DMRG_Hubbard.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
       <AdditionalOptions>
@@ -56,9 +56,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "50A297481CA963000060D68B"
-            BuildableName = "DMRG-Hubbard-v2"
-            BlueprintName = "DMRG-Hubbard-v2"
-            ReferencedContainer = "container:DMRG-Hubbard-v2.xcodeproj">
+            BuildableName = "DMRG_Hubbard"
+            BlueprintName = "DMRG_Hubbard"
+            ReferencedContainer = "container:DMRG_Hubbard.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
       <AdditionalOptions>
@@ -75,9 +75,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "50A297481CA963000060D68B"
-            BuildableName = "DMRG-Hubbard-v2"
-            BlueprintName = "DMRG-Hubbard-v2"
-            ReferencedContainer = "container:DMRG-Hubbard-v2.xcodeproj">
+            BuildableName = "DMRG_Hubbard"
+            BlueprintName = "DMRG_Hubbard"
+            ReferencedContainer = "container:DMRG_Hubbard.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>
