@@ -3,7 +3,7 @@
 //  DMRG-Hubbard
 //
 //  Created by Andrew Shen on 16/3/28.
-//  Copyright © 2016年 Andrew Shen. All rights reserved.
+//  Copyright © 2016 Andrew Shen. All rights reserved.
 //
 //#define EIGEN_NO_AUTOMATIC_RESIZING
 #define EIGEN_INITIALIZE_MATRICES_BY_NAN

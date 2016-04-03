@@ -3,7 +3,7 @@
 //  DMRG-Hubbard
 //
 //  Created by Andrew Shen on 16/3/30.
-//  Copyright © 2016年 Andrew Shen. All rights reserved.
+//  Copyright © 2016 Andrew Shen. All rights reserved.
 //
 
 #ifndef U_1__Symmetry_hpp
