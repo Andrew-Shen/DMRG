@@ -14,16 +14,18 @@
 #include <vector>
 #include <Eigen/Dense>
 
-
 using namespace Eigen;
 using namespace std;
+
+MatrixXd matrix_direct_plus(MatrixXd &m1, MatrixXd &m2);
+void matrix_reorder(MatrixXd &m, vector<int> &vec_idx);
+vector<int> sort_index(vector<int> &vec);
 
 class OperatorBlock
 {
 public:
-    int max_particle_number;
-    
     vector<MatrixXd> block;
+    vector<int> QuantumN;
     
     OperatorBlock();
     OperatorBlock(int _size);
@@ -32,16 +34,21 @@ public:
     
     size_t size()
     {
-        return block.size();
+        return QuantumN.size();
     }
     
-    MatrixXd regenerate();
-    MatrixXd super_regenerate();
+    void CheckConsistency();
+    void ZeroPurification();
+    void Update(MatrixXd &m, vector<int> &qn);
     
-    void save_block(MatrixXd &m, VectorXd &v);
-    void save_superblock(MatrixXd &m, VectorXd &v);
-
+    MatrixXd Operator_full();
+    vector<int> QuantumN_full();
 };
+
+vector<int> QuantumN_kron(OperatorBlock &ob1, OperatorBlock &ob2);
+
+
+
 
 class WavefunctionBlock
 {

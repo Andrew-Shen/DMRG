@@ -11,7 +11,6 @@
 		50A297591CA963710060D68B /* Class_DMRGBlock.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 50A297531CA963710060D68B /* Class_DMRGBlock.cpp */; };
 		50A2975A1CA963710060D68B /* Class_DMRGSystem.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 50A297551CA963710060D68B /* Class_DMRGSystem.cpp */; };
 		50A2975B1CA963710060D68B /* Lanczos.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 50A297571CA963710060D68B /* Lanczos.cpp */; };
-		50A2975E1CAC03050060D68B /* U(1)_Symmetry.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 50A2975C1CAC03050060D68B /* U(1)_Symmetry.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -35,8 +34,6 @@
 		50A297561CA963710060D68B /* Class_DMRGSystem.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = Class_DMRGSystem.hpp; sourceTree = "<group>"; };
 		50A297571CA963710060D68B /* Lanczos.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Lanczos.cpp; sourceTree = "<group>"; };
 		50A297581CA963710060D68B /* Lanczos.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = Lanczos.hpp; sourceTree = "<group>"; };
-		50A2975C1CAC03050060D68B /* U(1)_Symmetry.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "U(1)_Symmetry.cpp"; sourceTree = "<group>"; };
-		50A2975D1CAC03050060D68B /* U(1)_Symmetry.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = "U(1)_Symmetry.hpp"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -76,8 +73,6 @@
 				50A297561CA963710060D68B /* Class_DMRGSystem.hpp */,
 				50A297571CA963710060D68B /* Lanczos.cpp */,
 				50A297581CA963710060D68B /* Lanczos.hpp */,
-				50A2975C1CAC03050060D68B /* U(1)_Symmetry.cpp */,
-				50A2975D1CAC03050060D68B /* U(1)_Symmetry.hpp */,
 			);
 			path = "DMRG-Hubbard";
 			sourceTree = "<group>";
@@ -142,7 +137,6 @@
 				50A2974D1CA963000060D68B /* main.cpp in Sources */,
 				50A2975B1CA963710060D68B /* Lanczos.cpp in Sources */,
 				50A2975A1CA963710060D68B /* Class_DMRGSystem.cpp in Sources */,
-				50A2975E1CAC03050060D68B /* U(1)_Symmetry.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
