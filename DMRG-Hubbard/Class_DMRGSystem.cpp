@@ -9,7 +9,6 @@
 
 #include "Class_DMRGSystem.hpp"
 #include "Lanczos.hpp"
-#include "U(1)_Symmetry.hpp"
 
 #include <iostream>
 #include <vector>
@@ -28,9 +27,10 @@ DMRGSystem::DMRGSystem(int _nsites, int _max_lanczos_iter, double _rel_err)
     BlockL.resize(nsites);
     BlockR.resize(nsites);
 
-    d_per_site = 4; // Dimension of Hilbert space per site.
     max_lanczos_iter = _max_lanczos_iter;
     rel_err = _rel_err;
+
+    d_per_site = 4; // Dimension of Hilbert space per site.
 
     //c_up0.resize(d_per_site, d_per_site);
     //c_down0.resize(d_per_site, d_per_site);
@@ -41,44 +41,36 @@ DMRGSystem::DMRGSystem(int _nsites, int _max_lanczos_iter, double _rel_err)
     
     c_up0 = MatrixXd::Zero(d_per_site, d_per_site);
     c_down0 = MatrixXd::Zero(d_per_site, d_per_site);
+    u0 = MatrixXd::Zero(d_per_site, d_per_site);
+    
     sz0 = MatrixXd::Zero(d_per_site, d_per_site);
     n_up0 = MatrixXd::Zero(d_per_site, d_per_site);
     n_down0 = MatrixXd::Zero(d_per_site, d_per_site);
-    u0 = MatrixXd::Zero(d_per_site, d_per_site);
-    sz0 = MatrixXd::Zero(d_per_site, d_per_site);
 
-    c_up0(0,2) = 1;
-    c_up0(1,3) = 1;
-    c_down0(0,1) = 1;
-    c_down0(2,3) = 1;
+    c_up0(0,1) = 1;
+    c_up0(2,3) = 1;
+    c_down0(0,2) = 1;
+    c_down0(1,3) = 1;
+    u0(3,3) = 1;
+    u = 1;
+    u0 = u * u0;
+
     sz0(1,1) = 0.5;
     sz0(2,2) = -0.5;
     n_up0(1,1) = 1.0;
     n_up0(3,3) = 1.0;
     n_down0(2,2) = 1.0;
     n_down0(3,3) = 1.0;
-    u0(3,3) = 1;
     
-    u = 1;
+    quantumN0 = {0, 1, 2};
     
-    number0 = VectorXd::Zero(3);
-    number0 << 1, 2, 1; // Corresponds to particle number 0, 1, 2
-    
+    // is this necessary?
     BlockL[0].resize(1);
     BlockR[0].resize(1);
     
-    BlockL[0].H.resize(3);
-    BlockL[0].H.block[0] = MatrixXd::Zero(1, 1);
-    BlockL[0].H.block[1] = MatrixXd::Zero(2, 2);
-    BlockL[0].H.block[2] = u * MatrixXd::Identity(1, 1);
+    BlockL[0].H.Update(u0, quantumN0);
+    BlockR[0].H.Update(u0, quantumN0);
     
-    BlockR[0].H.resize(3);
-    BlockR[0].H.block[0] = MatrixXd::Zero(1, 1);
-    BlockR[0].H.block[1] = MatrixXd::Zero(2, 2);
-    BlockR[0].H.block[2] = u * MatrixXd::Identity(1, 1);
-    
-    BlockL[0].number = number0;
-    BlockR[0].number = number0;
     
     BlockL[0].c_up[0].resize(2);
     BlockL[0].c_up[0].block[0].resize(1, 2);

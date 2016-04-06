@@ -27,11 +27,13 @@ class DMRGSystem
 public:
     MatrixXd c_up0;
     MatrixXd c_down0;
+    MatrixXd u0;
+    
     MatrixXd sz0;
     MatrixXd n_up0;
     MatrixXd n_down0;
-    MatrixXd u0;
-    VectorXd number0;
+    
+    vector<int> quantumN0;
     
     vector<DMRGBlock> BlockL;
     vector<DMRGBlock> BlockR;

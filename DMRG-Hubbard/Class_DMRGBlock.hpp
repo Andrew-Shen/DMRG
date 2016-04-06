@@ -47,6 +47,20 @@ public:
 
 vector<int> QuantumN_kron(OperatorBlock &ob1, OperatorBlock &ob2);
 
+class SuperBlock : public OperatorBlock
+{
+    vector<size_t> block_size;
+    void CheckConsistency();
+    
+    SuperBlock();
+    SuperBlock(int _size);
+    
+};
+
+void SuperBlock::CheckConsistency()
+{
+    
+}
 
 
 
@@ -76,17 +90,12 @@ public:
 class DMRGBlock
 {
 public:
-    int size;
-    VectorXd number;
-    
     OperatorBlock H;
     OperatorBlock U;
 
     vector<OperatorBlock> c_up;
     vector<OperatorBlock> c_down;
-    //vector<VectorXd> number;
     
-
     DMRGBlock()
     {
         resize(1);
@@ -99,15 +108,17 @@ public:
     
     DMRGBlock &resize(int n)
     {
-        size = n;
-        
         c_up.resize(n);
         c_down.resize(n);
-        //number.resize(n);
-        
         
         return *this;
     }
+    
+    size_t size()
+    {
+        return c_up.size();
+    }
+
 };
 
 
