@@ -10,7 +10,6 @@
 #include "Lanczos.hpp"
 #include "Class_DMRGSystem.hpp"
 #include "Class_DMRGBlock.hpp"
-#include "U(1)_Symmetry.hpp"
 
 
 #include <iostream>
@@ -20,109 +19,69 @@
 using namespace Eigen;
 using namespace std;
 
-
-WavefunctionBlock random_wavefunction(DMRGSystem &S, int n)
+WavefunctionBlock initial_wavefunction(DMRGSystem &S, int n, WBType wb_type)
 {
     int left_size = S.left_size;
     int right_size = S.right_size;
     
-    VectorXd number_left =  S.BlockL[left_size].number;
-    VectorXd number_right = S.BlockR[right_size].number;
-    int n_max_left = (int)number_left.size() - 1;
-    int n_max_right = (int)number_right.size() - 1;
+    int left_qn, right_idx;
     
-    WavefunctionBlock npsi(n);
-    for (int i = 0; i <= n; i++) {
-        if ((n - i > n_max_right) || (i > n_max_left)) {
-            npsi.block[i].resize(0, 0);
+    WavefunctionBlock npsi;
+    npsi.quantumN_sector = n;
+    npsi.block.clear();
+    npsi.QuantumN.clear();
+    
+    for (int i = 0; i < S.BlockL[left_size].H.size(); i++) {
+        left_qn = S.BlockL[left_size].H.QuantumN[i];
+        if (left_qn > n) {
+            break;
+        }
+        right_idx = S.BlockR[right_size].H.SearchQuantumN(n - left_qn);
+        if (right_idx == -1) {
             continue;
         }
-        if (S.BlockL[left_size].number(i) == 0 || S.BlockR[right_size].number(n - i) == 0) {
-            npsi.block[i].resize(0, 0);
-        } else {
-            npsi.block[i] = npsi.block[i] = MatrixXd::Random(S.BlockL[left_size].number(i), S.BlockR[right_size].number(n - i));
+        npsi.QuantumN.push_back(left_qn);
+        S.BlockL[left_size].H.CheckConsistency();
+        S.BlockR[right_size].H.CheckConsistency();
+        switch (wb_type) {
+            case WBType::RANDOM:
+                npsi.block.push_back(MatrixXd::Random(S.BlockL[left_size].H.block[i].cols(),
+                                                      S.BlockR[right_size].H.block[right_idx].cols()));
+                break;
+            case WBType::ONES:
+                npsi.block.push_back(MatrixXd::Ones(S.BlockL[left_size].H.block[i].cols(),
+                                                    S.BlockR[right_size].H.block[right_idx].cols()));
+                break;
+            case WBType::ZERO:
+                npsi.block.push_back(MatrixXd::Zero(S.BlockL[left_size].H.block[i].cols(),
+                                                    S.BlockR[right_size].H.block[right_idx].cols()));
+                break;
+            default:
+                break;
         }
     }
-    
-    return npsi;
-}
-
-WavefunctionBlock zero_wavefunction(DMRGSystem &S, int n)
-{
-    int left_size = S.left_size;
-    int right_size = S.right_size;
-    
-    VectorXd number_left =  S.BlockL[left_size].number;
-    VectorXd number_right = S.BlockR[right_size].number;
-    int n_max_left = (int)number_left.size() - 1;
-    int n_max_right = (int)number_right.size() - 1;
-    
-    WavefunctionBlock npsi(n);
-    for (int i = 0; i <= n; i++) {
-        if ((n - i > n_max_right) || (i > n_max_left)) {
-            npsi.block[i].resize(0, 0);
-            continue;
-        }
-        if (S.BlockL[left_size].number(i) == 0 || S.BlockR[right_size].number(n - i) == 0) {
-            npsi.block[i].resize(0, 0);
-        } else {
-            npsi.block[i] = MatrixXd::Zero(S.BlockL[left_size].number(i), S.BlockR[right_size].number(n - i));
-        }
+    if (wb_type != WBType::ZERO) {
+        npsi.normalize();
     }
-    
-    return npsi;
-}
-
-WavefunctionBlock one_wavefunction(DMRGSystem &S, int n)
-{
-    int left_size = S.left_size;
-    int right_size = S.right_size;
-    
-    VectorXd number_left =  S.BlockL[left_size].number;
-    VectorXd number_right = S.BlockR[right_size].number;
-    int n_max_left = (int)number_left.size() - 1;
-    int n_max_right = (int)number_right.size() - 1;
-    
-    WavefunctionBlock npsi(n);
-    for (int i = 0; i <= n; i++) {
-        if ((n - i > n_max_right) || (i > n_max_left)) {
-            npsi.block[i].resize(0, 0);
-            continue;
-        }
-        if (S.BlockL[left_size].number(i) == 0 || S.BlockR[right_size].number(n - i) == 0) {
-            npsi.block[i].resize(0, 0);
-        } else {
-            npsi.block[i] = MatrixXd::Ones(S.BlockL[left_size].number(i), S.BlockR[right_size].number(n - i));
-        }
-        
-        //cout << "npsi.block" << i << endl;
-        //cout << npsi.block[i] << endl;
-    }
-    
     return npsi;
 }
 
 double inner_product(WavefunctionBlock &v1, WavefunctionBlock &v2)
 {
-    assert(v1.total_particle_number == v2.total_particle_number && "Particle numbers do not match! ");
+    assert(v1.quantumN_sector == v2.quantumN_sector && "WavefunctionBlock InnerProduct: Quantum numbers do not match! ");
     
     MatrixXd tmat;
     double res = 0;
     
-    for (int i = 0; i <= v1.total_particle_number; i++) {
-        //if (v1.block[i].cols() != v2.block[i].cols()) {
-        //    cout << v1.block[i].cols() << "kk"<< v2.block[i].cols() << endl;
-        //    cout << v1.block[i].rows() << "kk"<< v2.block[i].rows() << endl;
-        //}
-        assert(v1.block[i].cols() == v2.block[i].cols() && "Matrix incosistent! ");
-        assert(v1.block[i].rows() == v2.block[i].rows() && "Matrix incosistent! ");
+    for (int i = 0; i < v1.size(); i++) {
+        assert(v1.block[i].cols() == v2.block[i].cols() && "WavefunctionBlock InnerProduct: Matrix incosistent! ");
+        assert(v1.block[i].rows() == v2.block[i].rows() && "WavefunctionBlock InnerProduct: Matrix incosistent! ");
         
         tmat = v1.block[i].transpose() * v2.block[i];
         res += tmat.trace();
     }
     
     return res;
-    
 }
 
 double Lanczos(DMRGSystem &S, int n, int _max_iter, double _rel_err, bool have_seed)
@@ -130,11 +89,8 @@ double Lanczos(DMRGSystem &S, int n, int _max_iter, double _rel_err, bool have_s
     int max_iter;       // Max number of Lanczos iteration
     double rel_err;
     vector<double> es;
-    //vector<MatrixXd> v; // v in Lanczos algorithm
-    //vector<MatrixXd> w; // w in Lanczos algorithm
-    //vector<MatrixXd> wp;    // w' in Lanczos algorithm
+
     vector<WavefunctionBlock> v;
-    
     vector<WavefunctionBlock> w;
     vector<WavefunctionBlock> wp;
     VectorXd main_diag; // Main diagonal in the tridiagonal matrix
@@ -143,31 +99,10 @@ double Lanczos(DMRGSystem &S, int n, int _max_iter, double _rel_err, bool have_s
     
     int left_size = S.left_size;
     int right_size = S.right_size;
-    int dim_l = S.BlockL[left_size].number.sum();
-    int dim_r = S.BlockR[right_size].number.sum();
-
-    size_t left_n_size = S.BlockL[left_size].number.size();
-    size_t right_n_size = S.BlockR[right_size].number.size();
-    if (left_n_size > right_n_size) {
-        S.BlockR[right_size].number.conservativeResize(left_n_size);
-        for (int i = 0; i < left_n_size - right_n_size; i++) {
-            S.BlockR[right_size].number(right_n_size + i) = 0;
-        }
-    }
+    size_t dim_l = S.BlockL[left_size].H.total_d();
+    size_t dim_r = S.BlockR[right_size].H.total_d();
     
-    if (right_n_size > left_n_size) {
-        S.BlockL[left_size].number.conservativeResize(right_n_size);
-        for (int i = 0; i < right_n_size - left_n_size; i++) {
-            S.BlockL[left_size].number(left_n_size + i) = 0;
-        }
-    }
-    
-    //cout << S.BlockL[left_size].number.transpose() << endl;
-    //cout << S.BlockR[right_size].number.transpose() << endl;
-    //assert(S.BlockL[left_size].number.size() == S.BlockR[right_size].number.size());
-    
-    
-    max_iter = min(_max_iter, dim_l * dim_r);
+    max_iter = min(_max_iter, (int)(dim_l * dim_r));
     rel_err = _rel_err;
     
     // Initialization of Lanczos
@@ -175,49 +110,37 @@ double Lanczos(DMRGSystem &S, int n, int _max_iter, double _rel_err, bool have_s
     v.resize(max_iter + 1);
     w.resize(max_iter + 1);
     wp.resize(max_iter + 1);
-    /*
-    for (int i = 0; i < v.size(); i++) {
-        v[i].resize(n);
-        w[i].resize(n);
-        wp[i].resize(n);
-    }
-     */
+ 
     main_diag.resize(max_iter + 1);
     main_diag = VectorXd::Zero(max_iter + 1);
     super_diag.resize(max_iter + 1);
     super_diag = VectorXd::Zero(max_iter + 1);
-    v[0] = zero_wavefunction(S, n);
+    v[0] = initial_wavefunction(S, n, WBType::ZERO);
     
     // Wavefunction Prediction
     if (have_seed == true) {
         v[1] = S.seed;
     } else {
-        v[1] = one_wavefunction(S, n);
-        //v[1] = random_wavefunction(S, n);
+        v[1] = initial_wavefunction(S, n, WBType::ONES);
     }
-    v[1].normalize();
     
     SelfAdjointEigenSolver<MatrixXd> tsolver;
-    S.psi = zero_wavefunction(S, n);
+    S.psi = initial_wavefunction(S, n, WBType::ZERO);
     for (int i = 1; i < max_iter; i++) {
-        //cout << "Iteration: " << i << endl;
-        wp[i] = symmetric_prod(S, n, v[i]);
-        
-        //cout << wp[i].block[0].size() << endl;
-        
-        //for (int j = 0; j <= wp[i].total_particle_number; j++) {
-        //    cout << "wp(" << j << ")=" << endl;
-        //    cout << wp[i].block[j] << endl;
-            //cout << "v(" << j << ")=" << endl;
-            //cout << v[i].block[j]<< endl;
-        //}
-        //cout << inner_product(wp[i], v[i]) << endl;
+        wp[i] = symmetric_prod(S, v[i]);
+        //wp[i].PrintInformation();
         main_diag(i - 1) = inner_product(wp[i], v[i]);
-        
+
         if (i == 1) {
             w[i] = wp[i] - v[i] * main_diag(i - 1);
         } else {
+            //wp[i].PrintInformation();
+            //v[i].PrintInformation();
+            //v[i - 1].PrintInformation();
+
+            //cout << main_diag(i - 1) << " " << super_diag(i - 2) << endl;
             w[i] = wp[i] - v[i] * main_diag(i - 1) - v[i - 1] * super_diag(i - 2);
+            //w[i].PrintInformation();
         }
         super_diag(i - 1) = w[i].norm();
         v[i + 1] = w[i] / super_diag(i - 1);
@@ -235,18 +158,21 @@ double Lanczos(DMRGSystem &S, int n, int _max_iter, double _rel_err, bool have_s
         tridiag.diagonal(-1) = tridiag.diagonal(1);
         tsolver.compute(tridiag);
         if (tsolver.info() != Success) {
-            cout << "main_diag " << main_diag.transpose() << endl;
-            cout << "super_diag " << super_diag.transpose() << endl;
-            cout << tridiag << endl;
             abort();
         }
         es[i - 1] = tsolver.eigenvalues()(0);
+
+        //cout << "main_diag(" << i -1 << ")=" << main_diag(i - 1) << endl;
+        //cout << "super_diag(" << i -1 << ")=" << super_diag(i - 1) << endl;
+        //cout << "eigenvalue = " << es[i - 1] << endl;
+        
         
         if (absl(es[i - 1] - es[i - 2]) < rel_err ) {
             for (int j = 0; j < i; j++) {
             S.psi = S.psi + v[j + 1] * tsolver.eigenvectors()(j,0);
             }
             cout << "Lancozs iteration: " << i << endl;
+            
             return es[i - 1];
             break;
         }
@@ -255,7 +181,7 @@ double Lanczos(DMRGSystem &S, int n, int _max_iter, double _rel_err, bool have_s
     
     tridiag.resize(max_iter, max_iter);
     tridiag = MatrixXd::Zero(max_iter, max_iter);
-    w[max_iter] = symmetric_prod(S, n, v[max_iter]);
+    w[max_iter] = symmetric_prod(S, v[max_iter]);
     
     main_diag(max_iter - 1) = inner_product(w[max_iter], v[max_iter]);
     for (int j = 0; j < max_iter - 2; j++) {
@@ -277,113 +203,69 @@ double Lanczos(DMRGSystem &S, int n, int _max_iter, double _rel_err, bool have_s
 }
 
 
-WavefunctionBlock symmetric_prod(DMRGSystem &S, int n, WavefunctionBlock &psi)
+WavefunctionBlock symmetric_prod(DMRGSystem &S, WavefunctionBlock &psi)
 {
     int left_size = S.left_size;
     int right_size = S.right_size;
 
-    VectorXd number_left =  S.BlockL[left_size].number;
-    VectorXd number_right = S.BlockR[right_size].number;
-    int n_max_left = (int)number_left.size() - 1;
-    int n_max_right = (int)number_right.size() - 1;
+    int n = psi.quantumN_sector;
     
-    WavefunctionBlock npsi(n);
-    for (int i = 0; i <= n; i++) {
-        //cout << n - i << endl;
-        if ((n - i > n_max_right) || (i > n_max_left)) {
-            npsi.block[i].resize(0, 0);
-            continue;
-        }
-        if (S.BlockL[left_size].number(i) == 0 || S.BlockR[right_size].number(n - i) == 0) {
-            npsi.block[i].resize(0, 0);
-            continue;
-        }
-        npsi.block[i] = MatrixXd::Zero(S.BlockL[left_size].number(i), S.BlockR[right_size].number(n - i));
-    }
-
+    // implement in the class ?
+    WavefunctionBlock npsi(psi);
+    npsi.block.clear();
+    
     MatrixXd tmat;
-    //cout << n << endl;
-    //cout << n_max_left << endl;
-    for (int i = 0; i <= min(n_max_left, n); i++) {
-        if (n - i > n_max_right) {
-            //cout << "n - i > n_max_right" << endl;
-            continue;
-        }
-        if (npsi.block[i].cols() == 0 || npsi.block[i].rows() == 0) {
-            //cout << "b" << endl;
-            continue;
-        }
-        //cout << "i=" << i << endl;
-        // H_L H_R
-        //cout << psi.block[i] << endl;
-        //cout << S.BlockL[left_size].H.block[i] << endl;
-        
-        assert(S.BlockL[left_size].H.block[i].cols() != 0 && S.BlockR[right_size].H.block[n - i].cols() != 0);
-        tmat = S.BlockL[left_size].H.block[i] * psi.block[i];
-        npsi.block[i] += tmat * S.BlockR[right_size].H.block[n - i];
-        
-        //cout << "kh" << i << endl;
 
+    int left_qn, left_idx, right_idx;
+    
+    // H_L H_R
+    for (int i = 0; i < psi.size(); i++) {
+        left_qn = psi.QuantumN[i];
+        left_idx = S.BlockL[left_size].H.SearchQuantumN(left_qn);
+        right_idx = S.BlockR[right_size].H.SearchQuantumN(n - left_qn);
         
-        // c_L^dag c_R
-        if (n - i > 0) {
-            if (S.BlockL[left_size].number(i) != 0 && S.BlockR[right_size].number(n - i - 1) != 0 &&
-                i != n_max_left) {
-                //cout << "i = " << i << " n-i-1 = " << n - i -1 << endl;
-                //cout << S.BlockL[left_size].number(i) << " " << S.BlockR[right_size].number(n - i - 1) << endl;
-                //cout << S.BlockL[left_size].c_up[left_size].block[i].rows() << " " << S.BlockR[right_size].c_up[right_size].block[n - i - 1].rows() << endl;
-                
-                if (S.BlockL[left_size].number(i + 1) != 0) {
-                    assert(S.BlockL[left_size].c_up[left_size].block[i].size() != 0 &&
-                           S.BlockR[right_size].c_up[right_size].block[n - i - 1].size() != 0);
-                    
-                    tmat = S.BlockL[left_size].c_up[left_size].block[i].transpose() * psi.block[i];
-                    npsi.block[i + 1] += tmat * S.BlockR[right_size].c_up[right_size].block[n - i - 1].transpose();
-                    tmat = S.BlockL[left_size].c_down[left_size].block[i].transpose() * psi.block[i];
-                    npsi.block[i + 1] += tmat * S.BlockR[right_size].c_down[right_size].block[n - i - 1].transpose();
-                    
-                    //cout << "kldag r" << endl;
-                
-                }
-            }
-        }
-        // c_L c_R^dag
-        if (i > 0) {
-            //cout << S.BlockL[left_size].number(i - 1) << " " << S.BlockR[right_size].number(n - i) << " " << n_max_right << endl;
-            if (S.BlockL[left_size].number(i - 1) != 0 && S.BlockR[right_size].number(n - i) != 0 &&
-                (n - i) != n_max_right) {
-                //cout << "a" << endl;
-                if (S.BlockR[right_size].number(n - i + 1) != 0) {
-                    //cout << "i - 1 = " << i - 1<< " n- i = " << n - i << " n_max_right" << n_max_right << endl;
-                    //cout << S.BlockL[left_size].number(i- 1) << " " << S.BlockR[right_size].number(n - i ) << endl;
-                    //cout << S.BlockL[left_size].c_up[left_size].block[i - 1].rows() << " " << S.BlockR[right_size].c_up[right_size].block[n - i ].rows() << endl;
-                    assert(S.BlockL[left_size].c_up[left_size].block[i - 1].size() != 0 &&
-                           S.BlockR[right_size].c_up[right_size].block[n - i].size() != 0);
-                    
-                    tmat = S.BlockL[left_size].c_up[left_size].block[i - 1] * psi.block[i];
-                    npsi.block[i - 1] += tmat * S.BlockR[right_size].c_up[right_size].block[n - i];
-                    //cout << S.BlockL[left_size].c_down[left_size].block[i - 1] << endl;
-                    //cout << "psi" << endl;
-                    //cout << S.BlockL[left_size].c_down[left_size].block[i] << endl;
-                    tmat = S.BlockL[left_size].c_down[left_size].block[i - 1] * psi.block[i];
-                    npsi.block[i - 1] += tmat * S.BlockR[right_size].c_down[right_size].block[n - i];
-                    
-                    //cout << "kl r dag" << endl;
-                }
-                
-            }
-        }
+        tmat = S.BlockL[left_size].H.block[left_idx] * psi.block[i];
+        tmat += psi.block[i] * S.BlockR[right_size].H.block[right_idx].transpose();
+        npsi.block.push_back(tmat);
     }
     
-    //for (int i = 0; i <= n; i++) {
-    //    cout << "npsi block " << i << endl;
-    //    cout << npsi.block[i] << endl;
-    //}
+    // c_L^dag c_R
+    int wb_idx;
+    for (int i = 0; i < psi.size(); i++) {
+        left_qn = psi.QuantumN[i];
+        left_idx = S.BlockL[left_size].H.SearchQuantumN(left_qn);
+        right_idx = S.BlockR[right_size].H.SearchQuantumN(n - left_qn - 1);
+        wb_idx = psi.SearchQuantumN(left_qn + 1);
+        
+        if (left_idx == -1 || right_idx == -1 || wb_idx == -1) {
+            continue;
+        }
+        
+        tmat = S.BlockL[left_size].c_up[left_size].block[left_idx].transpose() * psi.block[i];
+        npsi.block[wb_idx] += tmat * S.BlockR[right_size].c_up[right_size].block[right_idx].transpose();
+        tmat = S.BlockL[left_size].c_down[left_size].block[left_idx].transpose() * psi.block[i];
+        npsi.block[wb_idx] += tmat * S.BlockR[right_size].c_down[right_size].block[right_idx].transpose();
+    }
     
-    //cout << "kkkkkkkk" << endl;
+    // c_L c_R^dag
+    for (int i = 0; i < psi.size(); i++) {
+        left_qn = psi.QuantumN[i];
+        left_idx = S.BlockL[left_size].H.SearchQuantumN(left_qn - 1);
+        right_idx = S.BlockR[right_size].H.SearchQuantumN(n - left_qn);
+        wb_idx = psi.SearchQuantumN(left_qn - 1);
+        
+        if (left_idx == -1 || right_idx == -1 || wb_idx == -1) {
+            continue;
+        }
+        
+        tmat = S.BlockL[left_size].c_up[left_size].block[left_idx] * psi.block[i];
+        npsi.block[wb_idx] += tmat * S.BlockR[right_size].c_up[right_size].block[right_idx];
+        tmat = S.BlockL[left_size].c_down[left_size].block[left_idx] * psi.block[i];
+        npsi.block[wb_idx] += tmat * S.BlockR[right_size].c_down[right_size].block[right_idx];
+    }
+    
     return npsi;
 }
-
 
 double absl(double _a)
 {

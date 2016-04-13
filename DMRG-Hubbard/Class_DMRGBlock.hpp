@@ -20,6 +20,7 @@ using namespace std;
 MatrixXd matrix_direct_plus(MatrixXd &m1, MatrixXd &m2);
 void matrix_reorder(MatrixXd &m, vector<int> &vec_idx);
 vector<int> sort_index(vector<int> &vec);
+vector<int> sort_index_double(vector<double> &vec);
 
 class OperatorBlock
 {
@@ -32,14 +33,30 @@ public:
     
     OperatorBlock &resize(int n);
     
-    size_t size()
+    size_t size() const
     {
         return QuantumN.size();
     }
     
+    size_t total_d()
+    {
+        size_t d = 0;
+        for (int i = 0; i < this -> size(); i++) {
+            d += block[i].cols();
+        }
+        return d;
+    }
+    
+    int begin(int idx);
+    int end(int idx);
+    
     void CheckConsistency();
+    void PrintInformation();
+    
+    void RhoPurification(const OperatorBlock &rho);
     void ZeroPurification();
     void Update(MatrixXd &m, vector<int> &qn);
+    int SearchQuantumN(int n) const;
     
     MatrixXd Operator_full();
     vector<int> QuantumN_full();
@@ -47,43 +64,58 @@ public:
 
 vector<int> QuantumN_kron(OperatorBlock &ob1, OperatorBlock &ob2);
 
+
 class SuperBlock : public OperatorBlock
 {
+public:
     vector<size_t> block_size;
     void CheckConsistency();
+    void Update(MatrixXd &m, vector<int> &qn);
     
-    SuperBlock();
-    SuperBlock(int _size);
+    SuperBlock &resize(int n);
     
+    void PrintInformation();
+    
+    void RhoPurification(const OperatorBlock &rho);
+    void ZeroPurification();
+    
+    MatrixXd Operator_full();
 };
-
-void SuperBlock::CheckConsistency()
-{
-    
-}
-
 
 
 class WavefunctionBlock
 {
 public:
-    int total_particle_number;
-    
+    int quantumN_sector;
     vector<MatrixXd> block;
+    vector<int> QuantumN;
     
     WavefunctionBlock();
     WavefunctionBlock(int _size);
     
+    int SearchQuantumN(int n);
+    
     WavefunctionBlock& resize(int n);
     
+    size_t size() const
+    {
+        return QuantumN.size();
+    }
+    
+    void PrintInformation();
+
     double norm();
     WavefunctionBlock& normalize();
-
     
+    WavefunctionBlock operator+(const WavefunctionBlock& rhs);
+    WavefunctionBlock operator-(const WavefunctionBlock& rhs);
     WavefunctionBlock operator*(double n);
     WavefunctionBlock operator/(double n);
-    WavefunctionBlock operator+(WavefunctionBlock x);
-    WavefunctionBlock operator-(WavefunctionBlock x);
+    
+    WavefunctionBlock& operator+=(const WavefunctionBlock& rhs);
+    WavefunctionBlock& operator-=(const WavefunctionBlock& rhs);
+    WavefunctionBlock& operator*=(double n);
+    WavefunctionBlock& operator/=(double n);
 };
 
 
@@ -93,8 +125,8 @@ public:
     OperatorBlock H;
     OperatorBlock U;
 
-    vector<OperatorBlock> c_up;
-    vector<OperatorBlock> c_down;
+    vector<SuperBlock> c_up;
+    vector<SuperBlock> c_down;
     
     DMRGBlock()
     {

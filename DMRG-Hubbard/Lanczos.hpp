@@ -19,16 +19,15 @@
 using namespace Eigen;
 using namespace std;
 
+enum class WBType {RANDOM, ZERO, ONES};
 
-WavefunctionBlock random_wavefunction(DMRGSystem &S, int n);
-WavefunctionBlock zero_wavefunction(DMRGSystem &S, int n);
-WavefunctionBlock one_wavefunction(DMRGSystem &S, int n);
+WavefunctionBlock initial_wavefunction(DMRGSystem &S, int n, WBType wb_type);
 double inner_product(WavefunctionBlock &v1, WavefunctionBlock &v2);
 
 
 
 double Lanczos(DMRGSystem &S, int n, int _max_iter, double _rel_err, bool have_seed);
-WavefunctionBlock symmetric_prod(DMRGSystem &S, int n, WavefunctionBlock &psi);
+WavefunctionBlock symmetric_prod(DMRGSystem &S, WavefunctionBlock &psi);
 
 
 double absl(double _a);

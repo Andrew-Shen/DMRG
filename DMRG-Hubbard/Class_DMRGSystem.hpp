@@ -33,7 +33,7 @@ public:
     MatrixXd n_up0;
     MatrixXd n_down0;
     
-    vector<int> quantumN0;
+    OperatorBlock H0;
     
     vector<DMRGBlock> BlockL;
     vector<DMRGBlock> BlockR;
@@ -55,7 +55,7 @@ public:
     int right_size;
     int left_size;
     
-    DMRGSystem(int _nsites, int _max_lanczos_iter, double _rel_err);
+    DMRGSystem(int _nsites, int _max_lanczos_iter, double _rel_err, double u);
    
     void BuildBlockLeft(int _iter);
     void BuildBlockRight(int _iter);

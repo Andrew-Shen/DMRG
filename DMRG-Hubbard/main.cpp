@@ -30,19 +30,18 @@ int main() {
     nsites = 40;
     n_sweeps = 10;
 
-    n_states_to_keep = 300;
+    n_states_to_keep = 500;
     max_lanczos_iter = 100;
     truncation_error = 1e-8;
     rel_err = 1e-9;
     
     // Model Paramater
     hubbard_u = 1;
-    density = 0.5;
-    particles = density * nsites;
+    particles = nsites;
     
     
     // Initialization
-    DMRGSystem S(nsites, max_lanczos_iter, rel_err);
+    DMRGSystem S(nsites, max_lanczos_iter, rel_err, hubbard_u);
     
     // Warmup
     for (int n = 1; n < nsites/2; n++) {
@@ -51,8 +50,8 @@ int main() {
         S.BuildBlockLeft(n);
         S.BuildBlockRight(n);
         
-        cout << "Total particle number " << (2 * n + 2) * density << endl;
-        S.GroundState((int)((2 * n + 2) * density), false);
+        cout << "Total particle number " << 2 * n + 2 << endl;
+        S.GroundState(2 * n + 2, false);
         
         S.Truncate(BlockPosition::LEFT, n_states_to_keep, truncation_error);
         S.Truncate(BlockPosition::RIGHT, n_states_to_keep, truncation_error);
@@ -63,7 +62,7 @@ int main() {
     
     int first_iter = 0.5 * nsites;
     for (int sweep = 1; sweep <= n_sweeps; sweep++) {
-        for (int iter = first_iter; iter < nsites - 2; iter++) {
+        for (int iter = first_iter; iter < nsites - 3; iter++) {
             cout << "=== Left-to-right Iteration " << iter << endl;
             S.BuildBlockLeft(iter);
             S.BuildBlockRight(nsites - iter - 2);
@@ -73,7 +72,7 @@ int main() {
 
         }
         first_iter = 1;
-        for (int iter = first_iter; iter < nsites - 2; iter++) {
+        for (int iter = first_iter; iter < nsites - 3; iter++) {
             cout << "=== Right-to-left Iteration " << iter << endl;
             S.BuildBlockLeft(nsites - iter - 2);
             S.BuildBlockRight(iter);
