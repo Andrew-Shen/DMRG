@@ -27,7 +27,8 @@ class OperatorBlock
 public:
     vector<MatrixXd> block;
     vector<int> QuantumN;
-    
+    vector<size_t> block_size;
+
     OperatorBlock();
     OperatorBlock(int _size);
     
@@ -68,17 +69,10 @@ vector<int> QuantumN_kron(OperatorBlock &ob1, OperatorBlock &ob2);
 class SuperBlock : public OperatorBlock
 {
 public:
-    vector<size_t> block_size;
     void CheckConsistency();
     void Update(MatrixXd &m, vector<int> &qn);
-    
-    SuperBlock &resize(int n);
-    
+        
     void PrintInformation();
-    
-    void RhoPurification(const OperatorBlock &rho);
-    void ZeroPurification();
-    
     MatrixXd Operator_full();
 };
 

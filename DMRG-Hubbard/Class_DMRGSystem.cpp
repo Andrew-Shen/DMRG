@@ -260,6 +260,8 @@ double DMRGSystem::Truncate(BlockPosition _position, int _max_m, double _trun_er
             
             tmat = BlockL[left_size].H.block[i] * rho_evec[i];
             BlockL[left_size].H.block[i] = rho_evec[i].transpose() * tmat;
+            
+            BlockL[left_size].H.block_size[i] = rho_evec[i].cols();
         }
         BlockL[left_size].H.ZeroPurification();
 
@@ -305,6 +307,8 @@ double DMRGSystem::Truncate(BlockPosition _position, int _max_m, double _trun_er
             
             tmat = BlockR[right_size].H.block[i] * rho_evec[i];
             BlockR[right_size].H.block[i] = rho_evec[i].transpose() * tmat;
+            
+            BlockR[right_size].H.block_size[i] = rho_evec[i].cols();
         }
         BlockR[right_size].H.ZeroPurification();
         

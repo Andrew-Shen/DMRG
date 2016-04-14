@@ -115,6 +115,7 @@ OperatorBlock::OperatorBlock(int _size)
 OperatorBlock &OperatorBlock::resize(int n)
 {
     QuantumN.resize(n);
+    block_size.resize(n);
     block.resize(n);
     
     return *this;
@@ -156,6 +157,11 @@ void OperatorBlock::PrintInformation()
     cout << "=========================" << endl;
     cout << this -> size() << " blocks in the OperatorBlock. With quantum numbers: " << endl;
     print(this -> QuantumN);
+    cout << "Corresponding matrix size: " << endl;
+    // rewrite using function template
+    for (const auto& i: this -> block_size)
+        cout << i << ' ';
+    cout << endl;
     cout << "Operator Blocks: " << endl;
     for (int i = 0; i < this -> size(); i++) {
         cout << "Block " << i << ", Quantum number: " << QuantumN[i] << endl;
@@ -166,13 +172,16 @@ void OperatorBlock::PrintInformation()
 
 void OperatorBlock::CheckConsistency()
 {
-    assert(QuantumN.size() == block.size() && "OperatorBlock: An inconsistency in the quantum number and the actual block. ");
+    size_t dqn = QuantumN.size();
+    assert(dqn == block.size() && "OperatorBlock: An inconsistency in the quantum number and the actual block. ");
+    assert(dqn == block_size.size() && "OperatorBlock: Quantum number and block size do not agree! ");
     
-    for (int i = 0; i < QuantumN.size(); i++) {
-        if (block.at(i).cols() != block.at(i).rows()) {
+    for (int i = 0; i < dqn; i++) {
+        if (block[i].cols() != block[i].rows()) {
             cout << "OperatorBlock: A non-square block! " << endl;
         }
-        if (block.at(i).cols() == 0) {
+        assert(block[i].cols() == block_size[i] && "OperatorBlock: An inconsistency in the matrix size. ");
+        if (block[i].cols() == 0) {
             cout << "OperatorBlock: A block with zero size encountered. OperatorBlock::ZeroPurification is recommended. " << endl;
         }
     }
@@ -181,6 +190,7 @@ void OperatorBlock::CheckConsistency()
 void OperatorBlock::RhoPurification(const OperatorBlock &rho)
 {
     vector<MatrixXd>::iterator it_block = block.begin();
+    vector<size_t>::iterator it_bs = block_size.begin();
     
     for(vector<int>::iterator it_qn = QuantumN.begin(); it_qn != QuantumN.end(); )
     {
@@ -188,34 +198,39 @@ void OperatorBlock::RhoPurification(const OperatorBlock &rho)
         {
             it_block = block.erase(it_block); // It is very important to return the iterator.
             it_qn = QuantumN.erase(it_qn);
+            it_bs = block_size.erase(it_bs);
         }
         else
         {
             it_block++;
             it_qn++;
+            it_bs++;
         }
     }
     
     for (int i = 0; i < this -> size(); i++) {
-        assert(QuantumN[i] == rho.QuantumN[i] && "SuperBlock: Quantum numbers of operator and rho do not match! ");
+        assert(QuantumN[i] == rho.QuantumN[i] && "OperatorBlock: Quantum numbers of operator and rho do not match! ");
     }
 }
 
 void OperatorBlock::ZeroPurification()
 {
     vector<int>::iterator it_qn = QuantumN.begin();
+    vector<size_t>::iterator it_bs = block_size.begin();
     
     for(vector<MatrixXd>::iterator it_block = block.begin(); it_block != block.end(); )
     {
-        if(it_block -> size() == 0)
+        if(*it_bs == 0) // the last "fictitious" block in the SuperBlock will not be removed in this way
         {
             it_block = block.erase(it_block); // It is very important to return the iterator.
             it_qn = QuantumN.erase(it_qn);
+            it_bs = block_size.erase(it_bs);
         }
         else
         {
             it_block++;
             it_qn++;
+            it_bs++;
         }
     }
 }
@@ -274,26 +289,28 @@ void OperatorBlock::Update(MatrixXd &m, vector<int> &qn)
     
     QuantumN.clear();
     block.clear();
+    block_size.clear();
     
     int flag_qn = qn[0];
     size_t pos = 0;
-    size_t block_size = 1;
+    size_t block_s = 1;
     for (int i = 1; i < dqn; i++) {
         if (qn.at(i) != flag_qn) {
             QuantumN.push_back(flag_qn);
-            block.push_back(m.block(pos, pos, block_size, block_size));
-            pos += block_size;
-            block_size = 1;
+            block.push_back(m.block(pos, pos, block_s, block_s));
+            block_size.push_back(block_s);
+            pos += block_s;
+            block_s = 1;
             flag_qn = qn.at(i);
             continue;
         }
-        block_size++;
+        block_s++;
     }
     
     // Special treatment for the last quantum number
     QuantumN.push_back(flag_qn);
-    block.push_back(m.block(pos, pos, block_size, block_size));
-    
+    block.push_back(m.block(pos, pos, block_s, block_s));
+    block_size.push_back(block_s);
 }
 
 int OperatorBlock::SearchQuantumN(int n) const
@@ -384,15 +401,6 @@ void SuperBlock::Update(MatrixXd &m, vector<int> &qn)
     block.push_back(MatrixXd::Zero(0, 0));
 }
 
-SuperBlock &SuperBlock::resize(int n)
-{
-    QuantumN.resize(n);
-    block_size.resize(n);
-    block.resize(n);
-    
-    return *this;
-}
-
 MatrixXd SuperBlock::Operator_full()
 {
     size_t total_d = 0;
@@ -410,54 +418,6 @@ MatrixXd SuperBlock::Operator_full()
     }
     
     return tmat;
-}
-
-void SuperBlock::RhoPurification(const OperatorBlock &rho)
-{
-    vector<MatrixXd>::iterator it_block = block.begin();
-    vector<size_t>::iterator it_bs = block_size.begin();
-    
-    for(vector<int>::iterator it_qn = QuantumN.begin(); it_qn != QuantumN.end(); )
-    {
-        if(rho.SearchQuantumN(*it_qn) == -1)
-        {
-            it_block = block.erase(it_block); // It is very important to return the iterator.
-            it_qn = QuantumN.erase(it_qn);
-            it_bs = block_size.erase(it_bs);
-        }
-        else
-        {
-            it_block++;
-            it_qn++;
-            it_bs++;
-        }
-    }
-    
-    for (int i = 0; i < this -> size(); i++) {
-        assert(QuantumN[i] == rho.QuantumN[i] && "SuperBlock: Quantum numbers of operator and rho do not match! ");
-    }
-}
-
-void SuperBlock::ZeroPurification()
-{
-    vector<int>::iterator it_qn = QuantumN.begin();
-    vector<size_t>::iterator it_bs = block_size.begin();
-    
-    for(vector<MatrixXd>::iterator it_block = block.begin(); it_block != block.end(); )
-    {
-        if(*it_bs == 0) // the last "fictitious" block will not be removed in this way
-        {
-            it_block = block.erase(it_block); // It is very important to return the iterator.
-            it_qn = QuantumN.erase(it_qn);
-            it_bs = block_size.erase(it_bs);
-        }
-        else
-        {
-            it_block++;
-            it_qn++;
-            it_bs++;
-        }
-    }
 }
 
 WavefunctionBlock::WavefunctionBlock()

@@ -23,7 +23,7 @@ using namespace std;
 int main() {
     
     int nsites, n_sweeps, n_states_to_keep, max_lanczos_iter;
-    double hubbard_u, particles, density;
+    double hubbard_u, particles;
     double rel_err, truncation_error;
 
     // DMRG Parameters
