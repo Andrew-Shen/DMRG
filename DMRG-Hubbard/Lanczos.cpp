@@ -119,28 +119,23 @@ double Lanczos(DMRGSystem &S, int n, int _max_iter, double _rel_err, bool have_s
     
     // Wavefunction Prediction
     if (have_seed == true) {
+        // seed must be normalized
         v[1] = S.seed;
     } else {
-        v[1] = initial_wavefunction(S, n, WBType::ONES);
+        v[1] = initial_wavefunction(S, n, WBType::RANDOM);
     }
     
     SelfAdjointEigenSolver<MatrixXd> tsolver;
     S.psi = initial_wavefunction(S, n, WBType::ZERO);
     for (int i = 1; i < max_iter; i++) {
         wp[i] = symmetric_prod(S, v[i]);
-        //wp[i].PrintInformation();
+        
         main_diag(i - 1) = inner_product(wp[i], v[i]);
 
         if (i == 1) {
             w[i] = wp[i] - v[i] * main_diag(i - 1);
         } else {
-            //wp[i].PrintInformation();
-            //v[i].PrintInformation();
-            //v[i - 1].PrintInformation();
-
-            //cout << main_diag(i - 1) << " " << super_diag(i - 2) << endl;
             w[i] = wp[i] - v[i] * main_diag(i - 1) - v[i - 1] * super_diag(i - 2);
-            //w[i].PrintInformation();
         }
         super_diag(i - 1) = w[i].norm();
         v[i + 1] = w[i] / super_diag(i - 1);
@@ -161,11 +156,6 @@ double Lanczos(DMRGSystem &S, int n, int _max_iter, double _rel_err, bool have_s
             abort();
         }
         es[i - 1] = tsolver.eigenvalues()(0);
-
-        //cout << "main_diag(" << i -1 << ")=" << main_diag(i - 1) << endl;
-        //cout << "super_diag(" << i -1 << ")=" << super_diag(i - 1) << endl;
-        //cout << "eigenvalue = " << es[i - 1] << endl;
-        
         
         if (absl(es[i - 1] - es[i - 2]) < rel_err ) {
             for (int j = 0; j < i; j++) {

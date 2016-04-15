@@ -18,7 +18,6 @@
 using namespace Eigen;
 using namespace std;
 
-enum class BlockPosition {LEFT,RIGHT};
 enum class SweepDirection {WR, L2R, R2L};
 
 
@@ -41,7 +40,7 @@ public:
     WavefunctionBlock psi;
     WavefunctionBlock seed;
     OperatorBlock rho;
-    
+
     double u;   // Hubbard U
     
     double energy;
@@ -62,7 +61,7 @@ public:
     void GroundState(int n, bool wf_prediction);
     double Truncate(BlockPosition _position, int _max_m, double _trun_err);
     //void Measure();
-    //void BuildSeed(SweepDirection dir);
+    void BuildSeed(int n, SweepDirection dir);
 };
 
 /*

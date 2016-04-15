@@ -99,8 +99,95 @@ vector<int> sort_index_double(vector<double> &vec)
     return idx;
 }
 
-vector<int> QuantumN_kron(OperatorBlock &ob1, OperatorBlock &ob2);
+vector<int> QuantumN_kron(OperatorBlock &ob1, OperatorBlock &ob2)
+{
+    vector<int> kron_qn;
+    
+    vector<int> qn1 = ob1.QuantumN_full();
+    vector<int> qn2 = ob2.QuantumN_full();
+    
+    size_t d1 = qn1.size();
+    size_t d2 = qn2.size();
+    
+    for (int i = 0; i < d1; i++) {
+        for (int j = 0; j < d2; j++) {
+            kron_qn.push_back(qn1.at(i) + qn2.at(j));
+        }
+    }
+    
+    return kron_qn;
+}
 
+vector<size_t> SqueezeQuantumN(vector<int> &qn)
+{
+    size_t dqn = qn.size();
+    
+    vector<int> nqn;
+    vector<size_t> block_size;
+
+    int flag_qn = qn[0];
+    size_t block_s = 1;
+    for (int i = 1; i < dqn; i++) {
+        if (qn[i] != flag_qn) {
+            nqn.push_back(flag_qn);
+            block_size.push_back(block_s);
+            block_s = 1;
+            flag_qn = qn[i];
+            continue;
+        }
+        block_s++;
+    }
+    
+    // Special treatment for the last quantum number
+    nqn.push_back(flag_qn);
+    block_size.push_back(block_s);
+    
+    qn = nqn;
+    return block_size;
+}
+
+// can the following two functions are essentially the duplication of the corresponding class function
+int SearchQuantumN(const vector<int>& qn, int n)
+{
+    for (int i = 0; i < qn.size(); i++) {
+        if (qn[i] == n) {
+            return i;
+        }
+    }
+    // if there is no such element
+    return -1;
+}
+
+int b_begin(const vector<size_t>& block_size, int idx)
+{
+    size_t n_blocks = block_size.size();
+    assert(idx > -1 && idx < n_blocks && "OperatorBlock: Index overbound! ");
+    
+    int res = 0;
+    // rewritten with while
+    for (int i = 0; i < n_blocks; i++) {
+        if (i == idx) {
+            break;
+        }
+        res += block_size[i];
+    }
+    return res;
+}
+
+int SearchBlock(const vector<size_t>& block_size, int idx)
+{
+    size_t n_blocks = block_size.size();
+    
+    int flag = 0;
+    for (int i = 0; i < n_blocks; i++) {
+        if (idx >= flag && idx < flag + block_size[i]) {
+            return i;
+        }
+        flag += block_size[i];
+    }
+    assert("Something must be wrong! ");
+    return ((int)n_blocks - 1);
+}
 
 OperatorBlock::OperatorBlock()
 {
@@ -261,25 +348,6 @@ vector<int> OperatorBlock::QuantumN_full()
     return expanded_qn;
 }
 
-vector<int> QuantumN_kron(OperatorBlock &ob1, OperatorBlock &ob2)
-{
-    vector<int> kron_qn;
-    
-    vector<int> qn1 = ob1.QuantumN_full();
-    vector<int> qn2 = ob2.QuantumN_full();
-    
-    size_t d1 = qn1.size();
-    size_t d2 = qn2.size();
-    
-    for (int i = 0; i < d1; i++) {
-        for (int j = 0; j < d2; j++) {
-            kron_qn.push_back(qn1.at(i) + qn2.at(j));
-        }
-    }
-    
-    return kron_qn;
-}
-
 void OperatorBlock::Update(MatrixXd &m, vector<int> &qn)
 {
     size_t dqn = qn.size();
@@ -295,13 +363,13 @@ void OperatorBlock::Update(MatrixXd &m, vector<int> &qn)
     size_t pos = 0;
     size_t block_s = 1;
     for (int i = 1; i < dqn; i++) {
-        if (qn.at(i) != flag_qn) {
+        if (qn[i] != flag_qn) {
             QuantumN.push_back(flag_qn);
             block.push_back(m.block(pos, pos, block_s, block_s));
             block_size.push_back(block_s);
             pos += block_s;
             block_s = 1;
-            flag_qn = qn.at(i);
+            flag_qn = qn[i];
             continue;
         }
         block_s++;
@@ -373,10 +441,10 @@ void SuperBlock::Update(MatrixXd &m, vector<int> &qn)
     int flag_qn = qn[0];
     size_t b_size = 1;
     for (int i = 1; i < dqn; i++) {
-        if (qn.at(i) != flag_qn) {
+        if (qn[i] != flag_qn) {
             QuantumN.push_back(flag_qn);
             block_size.push_back(b_size);
-            flag_qn = qn.at(i);
+            flag_qn = qn[i];
             b_size = 0;
         }
         b_size++;
@@ -575,4 +643,40 @@ WavefunctionBlock& WavefunctionBlock::operator/=(double n)
         block[i] /= n;
     }
     return *this;
+}
+
+void WavefunctionBlock::Truncation(OperatorBlock& U, BlockPosition pos)
+{
+    MatrixXd tmat;
+    int U_idx;
+    for (int i = 0; i < size(); i++) {
+        if (pos == BlockPosition::LEFT) {
+            U_idx = U.SearchQuantumN(QuantumN[i]);
+            assert(U_idx != -1 && "WavefunctionBlock: Corresponding quantum number not found! ");
+            tmat = U.block[U_idx] * block[i];
+        } else {
+            U_idx = U.SearchQuantumN(quantumN_sector - QuantumN[i]);
+            assert(U_idx != -1 && "WavefunctionBlock: Corresponding quantum number not found! ");
+            tmat = block[i] * U.block[U_idx];
+        }
+        block[i] = tmat;
+    }
+    
+    // Zero purification
+    vector<int>::iterator it_qn = QuantumN.begin();
+    
+    for(vector<MatrixXd>::iterator it_block = block.begin(); it_block != block.end(); )
+    {
+        if(it_block -> cols() == 0 || it_block -> rows() == 0)
+        {
+            it_block = block.erase(it_block); // It is very important to return the iterator.
+            it_qn = QuantumN.erase(it_qn);
+        }
+        else
+        {
+            it_block++;
+            it_qn++;
+        }
+    }
+
 }

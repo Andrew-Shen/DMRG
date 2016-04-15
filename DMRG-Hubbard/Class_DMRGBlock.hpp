@@ -17,6 +17,8 @@
 using namespace Eigen;
 using namespace std;
 
+enum class BlockPosition {LEFT,RIGHT};
+
 MatrixXd matrix_direct_plus(MatrixXd &m1, MatrixXd &m2);
 void matrix_reorder(MatrixXd &m, vector<int> &vec_idx);
 vector<int> sort_index(vector<int> &vec);
@@ -58,13 +60,16 @@ public:
     void ZeroPurification();
     void Update(MatrixXd &m, vector<int> &qn);
     int SearchQuantumN(int n) const;
-    
+
     MatrixXd Operator_full();
     vector<int> QuantumN_full();
 };
 
 vector<int> QuantumN_kron(OperatorBlock &ob1, OperatorBlock &ob2);
-
+vector<size_t> SqueezeQuantumN(vector<int> &qn);
+int SearchQuantumN(const vector<int>& qn, int n);
+int b_begin(const vector<size_t>& block_size, int idx);
+int SearchBlock(const vector<size_t>& block_size, int idx);
 
 class SuperBlock : public OperatorBlock
 {
@@ -110,6 +115,8 @@ public:
     WavefunctionBlock& operator-=(const WavefunctionBlock& rhs);
     WavefunctionBlock& operator*=(double n);
     WavefunctionBlock& operator/=(double n);
+    
+    void Truncation(OperatorBlock& U, BlockPosition pos);
 };
 
 
@@ -121,6 +128,8 @@ public:
 
     vector<SuperBlock> c_up;
     vector<SuperBlock> c_down;
+    
+    vector<int> idx;
     
     DMRGBlock()
     {

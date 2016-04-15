@@ -27,8 +27,8 @@ int main() {
     double rel_err, truncation_error;
 
     // DMRG Parameters
-    nsites = 40;
-    n_sweeps = 10;
+    nsites = 30;
+    n_sweeps = 3;
 
     n_states_to_keep = 500;
     max_lanczos_iter = 100;
@@ -42,7 +42,7 @@ int main() {
     
     // Initialization
     DMRGSystem S(nsites, max_lanczos_iter, rel_err, hubbard_u);
-    
+    S.sweep = false;
     // Warmup
     for (int n = 1; n < nsites/2; n++) {
         cout << "=== Warmup Iteration " << n << endl;
@@ -59,20 +59,26 @@ int main() {
     
     // Sweep
     cout << "=== Start sweeps" << endl;
-    
     int first_iter = 0.5 * nsites;
     for (int sweep = 1; sweep <= n_sweeps; sweep++) {
-        for (int iter = first_iter; iter < nsites - 3; iter++) {
+        // this is ugly
+        if (first_iter == 1) {
+            S.left_size = 0;
+            S.right_size = nsites - 2;
+        }
+        for (int iter = first_iter; iter < nsites - 2; iter++) { // why must n-2 to predict wavefunction
             cout << "=== Left-to-right Iteration " << iter << endl;
+            S.BuildSeed(particles, SweepDirection::L2R);
             S.BuildBlockLeft(iter);
+
             S.BuildBlockRight(nsites - iter - 2);
-            //S.BuildSeed(L2R);
-            S.GroundState(particles, false);
+
+            S.GroundState(particles, true);
             S.Truncate(BlockPosition::LEFT, n_states_to_keep, truncation_error);
 
         }
         first_iter = 1;
-        for (int iter = first_iter; iter < nsites - 3; iter++) {
+        for (int iter = first_iter; iter < nsites - 2; iter++) {
             cout << "=== Right-to-left Iteration " << iter << endl;
             S.BuildBlockLeft(nsites - iter - 2);
             S.BuildBlockRight(iter);

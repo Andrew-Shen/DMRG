@@ -90,6 +90,8 @@ void DMRGSystem::BuildBlockLeft(int _iter)
     vector<int> quantumN = QuantumN_kron(BlockL[left_size - 1].H, H0);
     vector<int> trans_idx = sort_index(quantumN);
     
+    BlockL[left_size].idx = trans_idx;
+    
     matrix_reorder(H, trans_idx);
     BlockL[left_size].H.Update(H, quantumN);
     
@@ -126,6 +128,8 @@ void DMRGSystem::BuildBlockRight(int _iter)
     
     vector<int> quantumN = QuantumN_kron(H0, BlockR[right_size - 1].H);
     vector<int> trans_idx = sort_index(quantumN);
+    
+    BlockR[right_size].idx = trans_idx;
     
     matrix_reorder(H, trans_idx);
     BlockR[right_size].H.Update(H, quantumN);
@@ -348,64 +352,122 @@ double DMRGSystem::Truncate(BlockPosition _position, int _max_m, double _trun_er
     return error;
 }
 
-
-/*
-void DMRGSystem::BuildSeed(SweepDirection dir)
+void DMRGSystem::BuildSeed(int n, SweepDirection dir)
 {
-    int alpha, beta, gama;  // Real tensor indices
-    MatrixXd old_psi;   // Intermediate result before tensor reshape
-    MatrixXd new_psi;   // Intermediate result after tensor reshape
+    WavefunctionBlock npsi;
+    npsi.quantumN_sector = n;
+    npsi.block.clear();
+    npsi.QuantumN.clear();
     
-    if (dir == L2R) {
+    if (dir == SweepDirection::L2R) {
+        left_size ++;
+        right_size --;
         if (left_size == 1) {
             seed = psi;
             return;
         } else {
-            const MatrixXd &UL = BlockL[left_size - 1].U;
-            const MatrixXd &UR = BlockR[right_size].U;
             
-            old_psi = UL * psi;
+            // build basis for left and right block
+            vector<int> qn_left = QuantumN_kron(BlockL[left_size - 1].H, H0);
+            vector<int> trans_idx_left = sort_index(qn_left);
+            vector<size_t> size_left = SqueezeQuantumN(qn_left);
+            assert(qn_left.size() == size_left.size());
             
-            new_psi.resize(old_psi.rows() * d_per_site, old_psi.cols() / d_per_site);
+            vector<int> qn_right = QuantumN_kron(H0, BlockR[right_size - 1].H);
+            vector<int> trans_idx_right = sort_index(qn_right);
+            vector<size_t> size_right = SqueezeQuantumN(qn_right);
+            assert(qn_right.size() == size_right.size());
+  
+            int left_qn, right_idx;
             
-            for (int i = 0; i < old_psi.rows(); i++) {
-                for (int j = 0; j < old_psi.cols(); j++) {
-                    alpha = i;
-                    gama = j % new_psi.cols();
-                    beta = (j - gama) / new_psi.cols();
-                    new_psi(i * d_per_site + beta, gama) = old_psi(i, j);
+            for (int i = 0; i < qn_left.size(); i++) {
+                left_qn = qn_left[i];
+                if (left_qn > n) {
+                    break;
+                }
+                right_idx = SearchQuantumN(qn_right, n - left_qn);
+                if (right_idx == -1) {
+                    continue;
+                }
+                npsi.QuantumN.push_back(left_qn);
+                MatrixXd tmat = MatrixXd::Ones(size_left[i], size_right.at(right_idx));
+                tmat *= 1e99;
+                npsi.block.push_back(tmat);
+            }
+            //npsi.normalize();
+        
+            for (int i = 0; i < npsi.size(); i++) {
+                assert(npsi.block[i].cols() == BlockR[right_size].U.block[BlockR[right_size].U.SearchQuantumN(n - npsi.QuantumN[i])].cols());
+                npsi.block[i].resize(npsi.block[i].rows(), BlockR[right_size].U.block[BlockR[right_size].U.SearchQuantumN(n - npsi.QuantumN[i])].rows());
+            }
+
+            // wavefunction transformation
+            psi.Truncation(BlockL[left_size - 1].U, BlockPosition::LEFT);
+            
+            for (int i = 0; i < psi.size(); i++) {
+                int qn = psi.QuantumN[i];
+                int block_left = BlockL[left_size - 1].H.SearchQuantumN(qn);
+                
+                for (int j = 0; j < psi.block[i].rows(); j++) {
+                    for (int k = 0; k < psi.block[i].cols(); k++) {
+                        //cout << "Block " << i << ", Row: " << j << ", Col: " << k << endl;
+                        //cout << "left_size = " << left_size << " right_size = " << right_size << endl;
+                        
+                        vector<int> qn_r = QuantumN_kron(H0, BlockR[right_size].H);
+                        vector<int> qn_r_idx = sort_index(qn_r);
+                        vector<size_t> size_r = SqueezeQuantumN(qn_r);
+                        
+                        int block_right = SearchQuantumN(qn_r, n - qn);
+                        
+                        //cout << block_right << endl;
+    
+                        int npsi_idx_right = b_begin(size_r, block_right) + k;
+                        
+                        //cout << BlockR[right_size].H.total_d() << " " << BlockR[right_size].idx.size() << endl;
+                        
+                        npsi_idx_right = BlockR[right_size + 1].idx.at(npsi_idx_right);
+                        
+                        size_t total_d_right = BlockR[right_size].H.total_d();
+                        double beta_idx = (npsi_idx_right - npsi_idx_right % (int)total_d_right) / total_d_right;
+                        
+                        
+                        assert(beta_idx >= 0 && beta_idx < d_per_site && floor(beta_idx) == beta_idx);
+                        
+                        int npsi_idx_left = BlockL[left_size - 1].H.begin(block_left) + j;
+                        npsi_idx_left = d_per_site * npsi_idx_left + beta_idx;
+                        npsi_idx_left = SearchQuantumN(trans_idx_left, npsi_idx_left);
+                        
+                        // order is important
+                        int npsi_block = SearchBlock(size_left, npsi_idx_left);
+                        int npsi_row = npsi_idx_left - b_begin(size_left, npsi_block);
+                        npsi_block = npsi.SearchQuantumN(qn_left.at(npsi_block));
+                        assert(npsi_block != -1);
+        
+                        
+                        int npsi_col = npsi_idx_right % (int)total_d_right;
+                        assert(npsi_col >= 0 && npsi_col < total_d_right);
+                        int r_block = SearchBlock(BlockR[right_size].H.block_size, npsi_col);
+                        assert(BlockR[right_size].U.block[BlockR[right_size].U.SearchQuantumN(n - npsi.QuantumN[npsi_block])].rows() == BlockR[right_size].H.block_size[r_block]);
+                        assert(npsi.block[npsi_block].cols() == BlockR[right_size].H.block_size[r_block]);
+                        npsi_col = npsi_col - BlockR[right_size].H.begin(r_block);
+                        
+                        npsi.block[npsi_block](npsi_row, npsi_col) = psi.block[i](j, k);
+                    }
                 }
             }
+            npsi.Truncation(BlockR[right_size].U, BlockPosition::RIGHT);
+            // this is very imporant
+            npsi.normalize();
+            seed = npsi;
             
-            seed = new_psi * UR;
         }
+        
     } else {
-        if (right_size == 1) {
-            seed = psi;
-            return;
-        } else {
-            const MatrixXd &UL = BlockL[left_size].U;
-            const MatrixXd &UR = BlockR[right_size - 1].U;
-            
-            old_psi = psi * UR.transpose();
-            
-            new_psi.resize(old_psi.rows() / d_per_site, old_psi.cols() * d_per_site);
-            
-            for (int i = 0; i < old_psi.rows(); i++) {
-                for (int j = 0; j < old_psi.cols(); j++) {
-                    gama = j;
-                    beta = i % d_per_site;
-                    alpha = (i - beta) / d_per_site;
-                    new_psi(alpha, beta * old_psi.cols() + gama) = old_psi(i, j);
-                }
-            }
-            
-            seed = UL.transpose() * new_psi;
-            
-        }
+        // right
     }
+    
 }
- */
+
 
 /*
 void DMRGSystem::Measure()
