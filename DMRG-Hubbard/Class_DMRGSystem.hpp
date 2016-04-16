@@ -20,7 +20,6 @@ using namespace std;
 
 enum class SweepDirection {WR, L2R, R2L};
 
-
 class DMRGSystem
 {
 public:

@@ -27,7 +27,7 @@ int main()
     double rel_err, truncation_error;
 
     // DMRG Parameters
-    nsites = 30;
+    nsites = 20;
     n_sweeps = 3;
 
     n_states_to_keep = 500;
