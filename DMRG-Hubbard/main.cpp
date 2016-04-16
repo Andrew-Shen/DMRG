@@ -48,14 +48,13 @@ int main()
 
         S.BuildBlockLeft(n);
         S.BuildBlockRight(n);
-        
+
         cout << "Total particle number " << 2 * n + 2 << endl;
         S.GroundState(2 * n + 2, false);
         
         S.Truncate(BlockPosition::LEFT, n_states_to_keep, truncation_error);
         S.Truncate(BlockPosition::RIGHT, n_states_to_keep, truncation_error);
     }
-    
     // Sweep
     cout << "=== Start sweeps" << endl;
     int first_iter = 0.5 * nsites;
@@ -67,18 +66,21 @@ int main()
         }
         for (int iter = first_iter; iter < nsites - 2; iter++) { // why must n-2 to predict wavefunction
             cout << "=== Left-to-right Iteration " << iter << endl;
-            S.BuildSeed(particles, SweepDirection::L2R);
+            S.state = SweepDirection::L2R;
+
+            S.BuildSeed(particles);
             S.BuildBlockLeft(iter);
 
             S.BuildBlockRight(nsites - iter - 2);
 
-            S.GroundState(particles, false);
+            S.GroundState(particles, true);
             S.Truncate(BlockPosition::LEFT, n_states_to_keep, truncation_error);
 
         }
         first_iter = 1;
         for (int iter = first_iter; iter < nsites - 2; iter++) {
             cout << "=== Right-to-left Iteration " << iter << endl;
+            S.state = SweepDirection::R2L;
             S.BuildBlockLeft(nsites - iter - 2);
             S.BuildBlockRight(iter);
             //S.BuildSeed(R2L);

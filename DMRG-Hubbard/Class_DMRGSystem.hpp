@@ -54,6 +54,8 @@ public:
     int right_size;
     int left_size;
     
+    SweepDirection state;
+    
     DMRGSystem(int _nsites, int _max_lanczos_iter, double _rel_err, double u);
    
     void BuildBlockLeft(int _iter);
@@ -61,7 +63,7 @@ public:
     void GroundState(int n, bool wf_prediction);
     double Truncate(BlockPosition _position, int _max_m, double _trun_err);
     //void Measure();
-    void BuildSeed(int n, SweepDirection dir);
+    void BuildSeed(int n);
 };
 
 /*

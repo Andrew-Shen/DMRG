@@ -20,18 +20,19 @@ using namespace std;
 enum class BlockPosition {LEFT,RIGHT};
 enum class SortOrder {ASCENDING, DESCENDING};
 
-template <typename Type> void print_vector(Type &vec);
+template <typename Type> void PrintVector(Type &vec);
 
-MatrixXd matrix_direct_plus(MatrixXd &m1, MatrixXd &m2);
-void matrix_reorder(MatrixXd &m, vector<int> &vec_idx);
+MatrixXd MatrixDirectPlus(MatrixXd &m1, MatrixXd &m2);
+void MatrixReorder(MatrixXd &m, vector<int> &vec_idx);
 
-template <typename Type> vector<int> sort_index(Type &vec, SortOrder so);
+template <typename Type> vector<int> SortIndex(Type &vec, SortOrder so);
 
 class OperatorBlock
 {
 public:
     vector<MatrixXd> block;
     vector<int> QuantumN;
+    // Only for square blocks
     vector<size_t> block_size;
 
     OperatorBlock();
@@ -46,30 +47,31 @@ public:
     
     void RhoPurification(const OperatorBlock &rho);
     void ZeroPurification();
-    void Update(MatrixXd &m, vector<int> &qn);
+    void UpdateQN(const vector<int> &qn);
+    void UpdateBlock(const MatrixXd &m);
     int SearchQuantumN(int n) const;
 
-    MatrixXd Operator_full();
-    vector<int> QuantumN_full();
+    MatrixXd FullOperator();
+    vector<int> FullQuantumN();
     
     // Only for square blocks
     size_t total_d()
     {
         size_t d = 0;
-        for (int i = 0; i < this -> size(); i++) {
-            d += block[i].cols();
+        for (int i = 0; i < size(); i++) {
+            d += block_size[i];
         }
         return d;
     }
-    int begin(int idx);
-    int end(int idx);
+    int BlockFirstIdx(int idx);
+    int BlockLastIdx(int idx);
     
     // For debug
     void CheckConsistency();
     void PrintInformation();
 };
 
-vector<int> QuantumN_kron(OperatorBlock &ob1, OperatorBlock &ob2);
+vector<int> KronQuantumN(OperatorBlock &ob1, OperatorBlock &ob2);
 vector<size_t> SqueezeQuantumN(vector<int> &qn);
 int SearchIndex(const vector<int>& qn, int n);
 int BlockFirstIndex(const vector<size_t>& block_size, int idx);
@@ -78,13 +80,13 @@ int SearchBlockIndex(const vector<size_t>& block_size, int idx);
 class SuperBlock : public OperatorBlock
 {
 public:
-    void CheckConsistency();
-    void Update(MatrixXd &m, vector<int> &qn);
-        
-    void PrintInformation();
-    MatrixXd Operator_full();
-};
+    void UpdateBlock(const MatrixXd &m);
+    
+    MatrixXd FullOperator();
 
+    void CheckConsistency();
+    void PrintInformation();
+};
 
 class WavefunctionBlock
 {
@@ -123,7 +125,6 @@ public:
     void Truncation(OperatorBlock& U, BlockPosition pos);
 };
 
-
 class DMRGBlock
 {
 public:
@@ -157,6 +158,8 @@ public:
     {
         return c_up.size();
     }
+    
+    void UpdateQN(const vector<int>& qn, int _size);
 
 };
 

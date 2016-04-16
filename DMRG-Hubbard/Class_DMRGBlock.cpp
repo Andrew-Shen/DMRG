@@ -18,18 +18,18 @@ using namespace Eigen;
 using namespace std;
 
 template <typename Type>
-void print_vector(Type &vec)
+void PrintVector(Type &vec)
 {
     for (const auto& i: vec)
         cout << i << ' ';
     cout << endl;
     
 }
-template void print_vector(const vector<int> &vec);
-template void print_vector(const vector<double> &vec);
-template void print_vector(const vector<size_t> &vec);
+template void PrintVector(const vector<int> &vec);
+template void PrintVector(const vector<double> &vec);
+template void PrintVector(const vector<size_t> &vec);
 
-MatrixXd matrix_direct_plus(MatrixXd &m1, MatrixXd &m2)
+MatrixXd MatrixDirectPlus(MatrixXd &m1, MatrixXd &m2)
 {
     size_t row_m1 = m1.rows();
     size_t row_m2 = m2.rows();
@@ -51,7 +51,7 @@ MatrixXd matrix_direct_plus(MatrixXd &m1, MatrixXd &m2)
     return nmat;
 }
 
-void matrix_reorder(MatrixXd &m, vector<int> &vec_idx)
+void MatrixReorder(MatrixXd &m, vector<int> &vec_idx)
 {
     size_t dm = m.cols();
     size_t dv = vec_idx.size();
@@ -71,7 +71,7 @@ void matrix_reorder(MatrixXd &m, vector<int> &vec_idx)
 }
 
 template <typename Type>
-vector<int> sort_index(Type &vec, SortOrder so)
+vector<int> SortIndex(Type &vec, SortOrder so)
 {
     // Initialize original index locations
     vector<int> idx(vec.size());
@@ -85,7 +85,7 @@ vector<int> sort_index(Type &vec, SortOrder so)
             sort(vec.begin(), vec.end());
         } else {
             // Using rbegin() and rend() is eqivalent to sorting -vec
-            // But ineqivalent to sort vec with std::greater()
+            // But *ineqivalent* to sorting vec with std::greater()
             sort(idx.rbegin(), idx.rend(),
                  [&vec](size_t i1, size_t i2) {return vec[i1] < vec[i2];});
             sort(vec.rbegin(), vec.rend());
@@ -94,16 +94,16 @@ vector<int> sort_index(Type &vec, SortOrder so)
     return idx;
 }
 // To avoid linker error
-template vector<int> sort_index<vector<int>>(vector<int> &vec, SortOrder so);
-template vector<int> sort_index<vector<double>>(vector<double> &vec, SortOrder so);
+template vector<int> SortIndex<vector<int>>(vector<int> &vec, SortOrder so);
+template vector<int> SortIndex<vector<double>>(vector<double> &vec, SortOrder so);
 
 
-vector<int> QuantumN_kron(OperatorBlock &ob1, OperatorBlock &ob2)
+vector<int> KronQuantumN(OperatorBlock &ob1, OperatorBlock &ob2)
 {
     vector<int> kron_qn;
     
-    vector<int> qn1 = ob1.QuantumN_full();
-    vector<int> qn2 = ob2.QuantumN_full();
+    vector<int> qn1 = ob1.FullQuantumN();
+    vector<int> qn2 = ob2.FullQuantumN();
     
     size_t d1 = qn1.size();
     size_t d2 = qn2.size();
@@ -208,12 +208,12 @@ OperatorBlock &OperatorBlock::resize(int n)
     return *this;
 }
 
-int OperatorBlock::begin(int idx)
+int OperatorBlock::BlockFirstIdx(int idx)
 {
     return BlockFirstIndex(block_size, idx);
 }
 
-int OperatorBlock::end(int idx)
+int OperatorBlock::BlockLastIdx(int idx)
 {
     size_t n_blocks = size();
     assert(idx > -1 && idx < n_blocks && "OperatorBlock: Index overbound! ");
@@ -222,43 +222,9 @@ int OperatorBlock::end(int idx)
     if (idx == n_blocks - 1) {
         res = total_d() - 1;
     } else {
-        res = begin(idx + 1) - 1;
+        res = BlockFirstIdx(idx + 1) - 1;
     }
     return res;
-}
-
-void OperatorBlock::PrintInformation()
-{
-    CheckConsistency();
-    cout << "=========================" << endl;
-    cout << this -> size() << " blocks in the OperatorBlock. With quantum numbers: " << endl;
-    print_vector(QuantumN);
-    cout << "Corresponding matrix size: " << endl;
-    // rewrite using function template
-    print_vector(block_size);
-    cout << "Operator Blocks: " << endl;
-    for (int i = 0; i < this -> size(); i++) {
-        cout << "Block " << i << ", Quantum number: " << QuantumN[i] << endl;
-        cout << block[i] << endl;
-    }
-    cout << "=========================" << endl;
-}
-
-void OperatorBlock::CheckConsistency()
-{
-    size_t dqn = QuantumN.size();
-    assert(dqn == block.size() && "OperatorBlock: An inconsistency in the quantum number and the actual block. ");
-    assert(dqn == block_size.size() && "OperatorBlock: Quantum number and block size do not agree! ");
-    
-    for (int i = 0; i < dqn; i++) {
-        if (block[i].cols() != block[i].rows()) {
-            cout << "OperatorBlock: A non-square block! " << endl;
-        }
-        assert(block[i].cols() == block_size[i] && "OperatorBlock: An inconsistency in the matrix size. ");
-        if (block[i].cols() == 0) {
-            cout << "OperatorBlock: A block with zero size encountered. OperatorBlock::ZeroPurification is recommended. " << endl;
-        }
-    }
 }
 
 void OperatorBlock::RhoPurification(const OperatorBlock &rho)
@@ -309,18 +275,18 @@ void OperatorBlock::ZeroPurification()
     }
 }
 
-MatrixXd OperatorBlock::Operator_full()
+MatrixXd OperatorBlock::FullOperator()
 {
     MatrixXd tmat;
     
     for (int i = 0; i < this -> size(); i++) {
-        tmat.noalias() = matrix_direct_plus(tmat, block.at(i));
+        tmat.noalias() = MatrixDirectPlus(tmat, block.at(i));
     }
     
     return tmat;
 }
 
-vector<int> OperatorBlock::QuantumN_full()
+vector<int> OperatorBlock::FullQuantumN()
 {
     vector<int> expanded_qn;
     
@@ -333,42 +299,106 @@ vector<int> OperatorBlock::QuantumN_full()
     return expanded_qn;
 }
 
-void OperatorBlock::Update(MatrixXd &m, vector<int> &qn)
+void OperatorBlock::UpdateQN(const vector<int> &qn)
 {
-    size_t dqn = qn.size();
-    
+    vector<int> tqn = qn;
+    block_size = SqueezeQuantumN(tqn);
+    QuantumN = tqn;
+}
+
+void OperatorBlock::UpdateBlock(const MatrixXd &m)
+{
     assert(m.cols() == m.rows() && "Update OperatorBlock: A non-square matrix! ");
-    assert((m.cols() == dqn) && "Update OperatorBlock: Dimensions of matrix and quantum number vector do not agree! ");
+    assert((m.cols() == total_d()) && "Update OperatorBlock: Dimensions of matrix and quantum number vector do not agree! ");
     
-    QuantumN.clear();
     block.clear();
-    block_size.clear();
-    
-    int flag_qn = qn[0];
+
     size_t pos = 0;
-    size_t block_s = 1;
-    for (int i = 1; i < dqn; i++) {
-        if (qn[i] != flag_qn) {
-            QuantumN.push_back(flag_qn);
-            block.push_back(m.block(pos, pos, block_s, block_s));
-            block_size.push_back(block_s);
-            pos += block_s;
-            block_s = 1;
-            flag_qn = qn[i];
-            continue;
-        }
-        block_s++;
+    for (int i = 0; i < size(); i++) {
+        size_t block_s = block_size[i];
+        block.push_back(m.block(pos, pos, block_s, block_s));
+        pos += block_s;
     }
-    
-    // Special treatment for the last quantum number
-    QuantumN.push_back(flag_qn);
-    block.push_back(m.block(pos, pos, block_s, block_s));
-    block_size.push_back(block_s);
 }
 
 int OperatorBlock::SearchQuantumN(int n) const
 {
     return SearchIndex(QuantumN, n);
+}
+
+void OperatorBlock::CheckConsistency()
+{
+    size_t dqn = QuantumN.size();
+    assert(dqn == block.size() && "OperatorBlock: An inconsistency in the quantum number and the actual block. ");
+    assert(dqn == block_size.size() && "OperatorBlock: Quantum number and block size do not agree! ");
+    
+    for (int i = 0; i < dqn; i++) {
+        if (block[i].cols() != block[i].rows()) {
+            cout << "OperatorBlock: A non-square block! " << endl;
+        }
+        assert(block[i].cols() == block_size[i] && "OperatorBlock: An inconsistency in the matrix size. ");
+        if (block[i].cols() == 0) {
+            cout << "OperatorBlock: A block with zero size encountered. OperatorBlock::ZeroPurification is recommended. " << endl;
+        }
+    }
+}
+
+void OperatorBlock::PrintInformation()
+{
+    CheckConsistency();
+    cout << "=========================" << endl;
+    cout << this -> size() << " blocks in the OperatorBlock. With quantum numbers: " << endl;
+    PrintVector(QuantumN);
+    cout << "Corresponding matrix size: " << endl;
+    PrintVector(block_size);
+    cout << "Operator Blocks: " << endl;
+    for (int i = 0; i < this -> size(); i++) {
+        cout << "Block " << i << ", Quantum number: " << QuantumN[i] << endl;
+        cout << block[i] << endl;
+    }
+    cout << "=========================" << endl;
+}
+
+
+void SuperBlock::UpdateBlock(const MatrixXd &m)
+{
+    assert(m.cols() == m.rows() && "Update OperatorBlock: A non-square matrix! ");
+    assert((m.cols() == total_d()) && "Update OperatorBlock: Dimensions of matrix and quantum number vector do not agree! ");
+
+    block.clear();
+
+    int flag_qn = QuantumN[0];
+    size_t pos = 0;
+    for (int i = 1; i < QuantumN.size(); i++) {
+        if (QuantumN.at(i) == flag_qn + 1) {
+            block.push_back(m.block(pos, pos + block_size.at(i - 1), block_size.at(i - 1), block_size.at(i)));
+        } else {
+            block.push_back(MatrixXd::Zero(0, 0));
+        }
+        flag_qn = QuantumN.at(i);
+        pos += block_size.at(i - 1);
+    }
+    // The last quantum number does not have coupling
+    block.push_back(MatrixXd::Zero(0, 0));
+}
+
+MatrixXd SuperBlock::FullOperator()
+{
+    size_t total_d = 0;
+    
+    for (int i = 0; i < block_size.size(); i++) {
+        total_d += block_size[i];
+    }
+    
+    MatrixXd tmat = MatrixXd::Zero(total_d, total_d);
+    
+    int pos = 0;
+    for (int i = 0; i < block_size.size(); i++) {
+        tmat.block(pos, pos + block_size[i], block[i].rows(), block[i].cols()) = block[i];
+        pos += block_size[i];
+    }
+    
+    return tmat;
 }
 
 void SuperBlock::CheckConsistency()
@@ -392,76 +422,14 @@ void SuperBlock::PrintInformation()
     CheckConsistency();
     cout << "=========================" << endl;
     cout << this -> size() << " blocks in the SuperBlock. With quantum numbers: " << endl;
-    print_vector(QuantumN);
+    PrintVector(QuantumN);
     cout << "Corresponding matrix size: " << endl;
-    print_vector(block_size);
+    PrintVector(block_size);
     cout << "Operator Blocks: " << endl;
     for (int i = 0; i < this -> size(); i++) {
         cout << "Block " << i << ", Quantum number: " << QuantumN[i] << endl;
         cout << block[i] << endl;
     }
-}
-
-
-void SuperBlock::Update(MatrixXd &m, vector<int> &qn)
-{
-    size_t dqn = qn.size();
-    
-    assert(m.cols() == m.rows() && "Update OperatorBlock: A non-square matrix! ");
-    assert((m.cols() == dqn) && "Update OperatorBlock: Dimensions of matrix and quantum number vector do not agree! ");
-    
-    QuantumN.clear();
-    block_size.clear();
-    block.clear();
-    
-    int flag_qn = qn[0];
-    size_t b_size = 1;
-    for (int i = 1; i < dqn; i++) {
-        if (qn[i] != flag_qn) {
-            QuantumN.push_back(flag_qn);
-            block_size.push_back(b_size);
-            flag_qn = qn[i];
-            b_size = 0;
-        }
-        b_size++;
-    }
-    // Special treatment for the last quantum number
-    QuantumN.push_back(flag_qn);
-    block_size.push_back(b_size);
-
-    
-    flag_qn = QuantumN[0];
-    size_t pos = 0;
-    for (int i = 1; i < QuantumN.size(); i++) {
-        if (QuantumN.at(i) == flag_qn + 1) {
-            block.push_back(m.block(pos, pos + block_size.at(i - 1), block_size.at(i - 1), block_size.at(i)));
-        } else {
-            block.push_back(MatrixXd::Zero(0, 0));
-        }
-        flag_qn = QuantumN.at(i);
-        pos += block_size.at(i - 1);
-    }
-    // The last quantum number does not have coupling
-    block.push_back(MatrixXd::Zero(0, 0));
-}
-
-MatrixXd SuperBlock::Operator_full()
-{
-    size_t total_d = 0;
-    
-    for (int i = 0; i < block_size.size(); i++) {
-        total_d += block_size[i];
-    }
-    
-    MatrixXd tmat = MatrixXd::Zero(total_d, total_d);
-    
-    int pos = 0;
-    for (int i = 0; i < block_size.size(); i++) {
-        tmat.block(pos, pos + block_size[i], block[i].rows(), block[i].cols()) = block[i];
-        pos += block_size[i];
-    }
-    
-    return tmat;
 }
 
 WavefunctionBlock::WavefunctionBlock()
@@ -489,7 +457,7 @@ void WavefunctionBlock::PrintInformation()
     cout << "=========================" << endl;
     cout << "Total quantum number of the WavefunctionBlock: " << quantumN_sector << endl;
     cout << size() << " blocks, with total quantum number: " << endl;
-    print_vector(QuantumN);
+    PrintVector(QuantumN);
     cout << "Norm of this WavefunctionBlock: " << this -> norm() << endl;
     cout << "Wavefunction Blocks: " << endl;
     for (int i = 0; i < size(); i++) {
@@ -648,5 +616,12 @@ void WavefunctionBlock::Truncation(OperatorBlock& U, BlockPosition pos)
             it_qn++;
         }
     }
+}
 
+void DMRGBlock::UpdateQN(const vector<int>& qn, int _size)
+{
+    resize(_size + 1);
+    H.UpdateQN(qn);
+    c_up[_size].UpdateQN(qn);
+    c_down[_size].UpdateQN(qn);
 }
