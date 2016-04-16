@@ -18,11 +18,14 @@ using namespace Eigen;
 using namespace std;
 
 enum class BlockPosition {LEFT,RIGHT};
+enum class SortOrder {ASCENDING, DESCENDING};
+
+template <typename Type> void print_vector(Type &vec);
 
 MatrixXd matrix_direct_plus(MatrixXd &m1, MatrixXd &m2);
 void matrix_reorder(MatrixXd &m, vector<int> &vec_idx);
-vector<int> sort_index(vector<int> &vec);
-vector<int> sort_index_double(vector<double> &vec);
+
+template <typename Type> vector<int> sort_index(Type &vec, SortOrder so);
 
 class OperatorBlock
 {
@@ -41,6 +44,15 @@ public:
         return QuantumN.size();
     }
     
+    void RhoPurification(const OperatorBlock &rho);
+    void ZeroPurification();
+    void Update(MatrixXd &m, vector<int> &qn);
+    int SearchQuantumN(int n) const;
+
+    MatrixXd Operator_full();
+    vector<int> QuantumN_full();
+    
+    // Only for square blocks
     size_t total_d()
     {
         size_t d = 0;
@@ -49,27 +61,19 @@ public:
         }
         return d;
     }
-    
     int begin(int idx);
     int end(int idx);
     
+    // For debug
     void CheckConsistency();
     void PrintInformation();
-    
-    void RhoPurification(const OperatorBlock &rho);
-    void ZeroPurification();
-    void Update(MatrixXd &m, vector<int> &qn);
-    int SearchQuantumN(int n) const;
-
-    MatrixXd Operator_full();
-    vector<int> QuantumN_full();
 };
 
 vector<int> QuantumN_kron(OperatorBlock &ob1, OperatorBlock &ob2);
 vector<size_t> SqueezeQuantumN(vector<int> &qn);
-int SearchQuantumN(const vector<int>& qn, int n);
-int b_begin(const vector<size_t>& block_size, int idx);
-int SearchBlock(const vector<size_t>& block_size, int idx);
+int SearchIndex(const vector<int>& qn, int n);
+int BlockFirstIndex(const vector<size_t>& block_size, int idx);
+int SearchBlockIndex(const vector<size_t>& block_size, int idx);
 
 class SuperBlock : public OperatorBlock
 {

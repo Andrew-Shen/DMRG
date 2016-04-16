@@ -17,13 +17,17 @@
 using namespace Eigen;
 using namespace std;
 
-void print(const vector<int> &vec)
+template <typename Type>
+void print_vector(Type &vec)
 {
     for (const auto& i: vec)
         cout << i << ' ';
     cout << endl;
+    
 }
-
+template void print_vector(const vector<int> &vec);
+template void print_vector(const vector<double> &vec);
+template void print_vector(const vector<size_t> &vec);
 
 MatrixXd matrix_direct_plus(MatrixXd &m1, MatrixXd &m2)
 {
@@ -66,38 +70,33 @@ void matrix_reorder(MatrixXd &m, vector<int> &vec_idx)
     m = tmat;
 }
 
-vector<int> sort_index(vector<int> &vec)
+template <typename Type>
+vector<int> sort_index(Type &vec, SortOrder so)
 {
     // Initialize original index locations
     vector<int> idx(vec.size());
     for (size_t i = 0; i != idx.size(); i++) idx[i] = i;
     
-    // Sort indexes based on comparing values in v
-    sort(idx.begin(), idx.end(),
-         [&vec](size_t i1, size_t i2) {return vec[i1] < vec[i2];});
-    
-    // Sort v itself
-    sort(vec.begin(), vec.end());
+        if (so == SortOrder::ASCENDING) {
+            // Sort indexes based on comparing values in v
+            sort(idx.begin(), idx.end(),
+                 [&vec](size_t i1, size_t i2) {return vec[i1] < vec[i2];});
+            // Sort v itself
+            sort(vec.begin(), vec.end());
+        } else {
+            // Using rbegin() and rend() is eqivalent to sorting -vec
+            // But ineqivalent to sort vec with std::greater()
+            sort(idx.rbegin(), idx.rend(),
+                 [&vec](size_t i1, size_t i2) {return vec[i1] < vec[i2];});
+            sort(vec.rbegin(), vec.rend());
+        }
     
     return idx;
 }
+// To avoid linker error
+template vector<int> sort_index<vector<int>>(vector<int> &vec, SortOrder so);
+template vector<int> sort_index<vector<double>>(vector<double> &vec, SortOrder so);
 
-// can be reduce to one sort?
-vector<int> sort_index_double(vector<double> &vec)
-{
-    // Initialize original index locations
-    vector<int> idx(vec.size());
-    for (size_t i = 0; i != idx.size(); i++) idx[i] = i;
-    
-    // Sort indexes based on comparing values in v
-    sort(idx.begin(), idx.end(),
-         [&vec](size_t i1, size_t i2) {return vec[i1] < vec[i2];});
-    
-    // Sort v itself
-    sort(vec.begin(), vec.end());
-    
-    return idx;
-}
 
 vector<int> QuantumN_kron(OperatorBlock &ob1, OperatorBlock &ob2)
 {
@@ -146,8 +145,7 @@ vector<size_t> SqueezeQuantumN(vector<int> &qn)
     return block_size;
 }
 
-// can the following two functions are essentially the duplication of the corresponding class function
-int SearchQuantumN(const vector<int>& qn, int n)
+int SearchIndex(const vector<int>& qn, int n)
 {
     for (int i = 0; i < qn.size(); i++) {
         if (qn[i] == n) {
@@ -158,8 +156,9 @@ int SearchQuantumN(const vector<int>& qn, int n)
     return -1;
 }
 
-int b_begin(const vector<size_t>& block_size, int idx)
+int BlockFirstIndex(const vector<size_t>& block_size, int idx)
 {
+    // this function returns the first index of a given block
     size_t n_blocks = block_size.size();
     assert(idx > -1 && idx < n_blocks && "OperatorBlock: Index overbound! ");
     
@@ -174,8 +173,9 @@ int b_begin(const vector<size_t>& block_size, int idx)
     return res;
 }
 
-int SearchBlock(const vector<size_t>& block_size, int idx)
+int SearchBlockIndex(const vector<size_t>& block_size, int idx)
 {
+    // given the index of the *sorted* big QN, this function returns the block it belongs
     size_t n_blocks = block_size.size();
     
     int flag = 0;
@@ -210,28 +210,17 @@ OperatorBlock &OperatorBlock::resize(int n)
 
 int OperatorBlock::begin(int idx)
 {
-    size_t n_blocks = this -> size();
-    assert(idx > -1 && idx < n_blocks && "OperatorBlock: Index overbound! ");
-    
-    int res = 0;
-    // rewritten with while
-    for (int i = 0; i < n_blocks; i++) {
-        if (i == idx) {
-            break;
-        }
-        res += block[i].cols();
-    }
-    return res;
+    return BlockFirstIndex(block_size, idx);
 }
 
 int OperatorBlock::end(int idx)
 {
-    size_t n_blocks = this -> size();
+    size_t n_blocks = size();
     assert(idx > -1 && idx < n_blocks && "OperatorBlock: Index overbound! ");
     
     int res;
     if (idx == n_blocks - 1) {
-        res = this -> total_d() - 1;
+        res = total_d() - 1;
     } else {
         res = begin(idx + 1) - 1;
     }
@@ -243,12 +232,10 @@ void OperatorBlock::PrintInformation()
     CheckConsistency();
     cout << "=========================" << endl;
     cout << this -> size() << " blocks in the OperatorBlock. With quantum numbers: " << endl;
-    print(this -> QuantumN);
+    print_vector(QuantumN);
     cout << "Corresponding matrix size: " << endl;
     // rewrite using function template
-    for (const auto& i: this -> block_size)
-        cout << i << ' ';
-    cout << endl;
+    print_vector(block_size);
     cout << "Operator Blocks: " << endl;
     for (int i = 0; i < this -> size(); i++) {
         cout << "Block " << i << ", Quantum number: " << QuantumN[i] << endl;
@@ -324,8 +311,6 @@ void OperatorBlock::ZeroPurification()
 
 MatrixXd OperatorBlock::Operator_full()
 {
-    //this -> ZeroPurification();
-    
     MatrixXd tmat;
     
     for (int i = 0; i < this -> size(); i++) {
@@ -383,13 +368,7 @@ void OperatorBlock::Update(MatrixXd &m, vector<int> &qn)
 
 int OperatorBlock::SearchQuantumN(int n) const
 {
-    for (int i = 0; i < this -> size(); i++) {
-        if (QuantumN[i] == n) {
-            return i;
-        }
-    }
-    // if there is no such element
-    return -1;
+    return SearchIndex(QuantumN, n);
 }
 
 void SuperBlock::CheckConsistency()
@@ -413,12 +392,9 @@ void SuperBlock::PrintInformation()
     CheckConsistency();
     cout << "=========================" << endl;
     cout << this -> size() << " blocks in the SuperBlock. With quantum numbers: " << endl;
-    print(this -> QuantumN);
+    print_vector(QuantumN);
     cout << "Corresponding matrix size: " << endl;
-    // rewrite using function template
-    for (const auto& i: this -> block_size)
-        cout << i << ' ';
-    cout << endl;
+    print_vector(block_size);
     cout << "Operator Blocks: " << endl;
     for (int i = 0; i < this -> size(); i++) {
         cout << "Block " << i << ", Quantum number: " << QuantumN[i] << endl;
@@ -512,11 +488,11 @@ void WavefunctionBlock::PrintInformation()
 {
     cout << "=========================" << endl;
     cout << "Total quantum number of the WavefunctionBlock: " << quantumN_sector << endl;
-    cout << this -> size() << " blocks, with total quantum number: " << endl;
-    print(this -> QuantumN);
+    cout << size() << " blocks, with total quantum number: " << endl;
+    print_vector(QuantumN);
     cout << "Norm of this WavefunctionBlock: " << this -> norm() << endl;
     cout << "Wavefunction Blocks: " << endl;
-    for (int i = 0; i < this -> size(); i++) {
+    for (int i = 0; i < size(); i++) {
         cout << "Block " << i << ", Quantum number: " << QuantumN[i] << endl;
         cout << block[i] << endl;
     }
@@ -547,13 +523,7 @@ WavefunctionBlock &WavefunctionBlock::normalize()
 
 int WavefunctionBlock::SearchQuantumN(int n)
 {
-    for (int i = 0; i < this -> size(); i++) {
-        if (QuantumN[i] == n) {
-            return i;
-        }
-    }
-    // if there is no such element
-    return -1;
+    return SearchIndex(QuantumN, n);
 }
 
 WavefunctionBlock WavefunctionBlock::operator+(const WavefunctionBlock& rhs)

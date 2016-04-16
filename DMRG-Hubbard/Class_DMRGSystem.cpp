@@ -88,7 +88,7 @@ void DMRGSystem::BuildBlockLeft(int _iter)
     kroneckerProduct(c_downL, c_down0.transpose()) + kroneckerProduct(c_downL.transpose(), c_down0);
     
     vector<int> quantumN = QuantumN_kron(BlockL[left_size - 1].H, H0);
-    vector<int> trans_idx = sort_index(quantumN);
+    vector<int> trans_idx = sort_index(quantumN, SortOrder::ASCENDING);
     
     BlockL[left_size].idx = trans_idx;
     
@@ -127,7 +127,7 @@ void DMRGSystem::BuildBlockRight(int _iter)
     kroneckerProduct(c_down0, c_downR.transpose()) + kroneckerProduct(c_down0.transpose(), c_downR);
     
     vector<int> quantumN = QuantumN_kron(H0, BlockR[right_size - 1].H);
-    vector<int> trans_idx = sort_index(quantumN);
+    vector<int> trans_idx = sort_index(quantumN, SortOrder::ASCENDING);
     
     BlockR[right_size].idx = trans_idx;
     
@@ -161,41 +161,37 @@ double DMRGSystem::Truncate(BlockPosition _position, int _max_m, double _trun_er
     int n = psi.quantumN_sector;
     size_t n_blocks = psi.QuantumN.size();
     
-    MatrixXd tmat;
-    
-    // implement in a class function?
     rho.QuantumN.clear();
     rho.block.clear();
+    rho.block_size.clear();
     if (_position == BlockPosition::LEFT) {
         for (int i = 0; i < n_blocks; i++) {
             rho.QuantumN.push_back(psi.QuantumN[i]);
             rho.block.push_back(psi.block[i] * psi.block[i].transpose());
+            rho.block_size.push_back(rho.block[i].cols());
         }
     } else {
         for (int i = 0; i < n_blocks; i++) {
             // Notice the i index is denoted as the quantum number of the LEFT block.
-            // Thus for manipulations of RIGHT block the index should be reversed.
-            
             rho.QuantumN.push_back(n - psi.QuantumN[i]);
             rho.block.push_back(psi.block[i].transpose() * psi.block[i]);
+            rho.block_size.push_back(rho.block[i].cols());
         }
-        // is this really necessary?
+        // Thus for manipulations of RIGHT block the index should be reversed.
         reverse(rho.QuantumN.begin(), rho.QuantumN.end());
         reverse(rho.block.begin(), rho.block.end());
-        
-        //rho.PrintInformation();
+        reverse(rho.block_size.begin(), rho.block_size.end());
     }
     
     size_t total_d = rho.total_d();
     
-    assert(n_blocks == rho.size() && "Truncate: Dimension of psi and rho do not match! ");
-
     vector<MatrixXd> rho_evec(n_blocks);
     vector<double> rho_eig_t, tvec;
     vector<int> eig_idx;
     
     SelfAdjointEigenSolver<MatrixXd> rsolver;
     for (int i = 0; i < n_blocks; i++) {
+        // The minus sign is for the descending order of the eigenvalue.
         rsolver.compute(-rho.block[i]);
         if (rsolver.info() != Success) abort();
         
@@ -206,13 +202,7 @@ double DMRGSystem::Truncate(BlockPosition _position, int _max_m, double _trun_er
         rho_evec[i] = rsolver.eigenvectors();
     }
     
-    for (int i = 0; i < total_d; i++) {
-        rho_eig_t.at(i) = -rho_eig_t.at(i);
-    }
-    eig_idx = sort_index_double(rho_eig_t);
-    for (int i = 0; i < total_d; i++) {
-        rho_eig_t.at(i) = -rho_eig_t.at(i);
-    }
+    eig_idx = sort_index(rho_eig_t, SortOrder::DESCENDING);
     
     error = 0;
 
@@ -239,9 +229,10 @@ double DMRGSystem::Truncate(BlockPosition _position, int _max_m, double _trun_er
     }
     int block_m;
     
+    MatrixXd tmat;
     for (int i = _m; i < total_d; i++) {
         for (int j = 0; j < n_blocks; j++) {
-            if ((eig_idx.at(i) <= rho.end(j)) && (eig_idx.at(i) >= rho.begin(j))) {
+            if ((eig_idx[i] <= rho.end(j)) && (eig_idx[i] >= rho.begin(j))) {
                 if (truncation_flag[j] != true) {
                     block_m = eig_idx[i] - rho.begin(j);
                     tmat = rho_evec[j].leftCols(block_m);
@@ -369,12 +360,12 @@ void DMRGSystem::BuildSeed(int n, SweepDirection dir)
             
             // build basis for left and right block
             vector<int> qn_left = QuantumN_kron(BlockL[left_size - 1].H, H0);
-            vector<int> trans_idx_left = sort_index(qn_left);
+            vector<int> trans_idx_left = sort_index(qn_left, SortOrder::ASCENDING);
             vector<size_t> size_left = SqueezeQuantumN(qn_left);
             assert(qn_left.size() == size_left.size());
             
             vector<int> qn_right = QuantumN_kron(H0, BlockR[right_size - 1].H);
-            vector<int> trans_idx_right = sort_index(qn_right);
+            vector<int> trans_idx_right = sort_index(qn_right, SortOrder::ASCENDING);
             vector<size_t> size_right = SqueezeQuantumN(qn_right);
             assert(qn_right.size() == size_right.size());
   
@@ -385,7 +376,7 @@ void DMRGSystem::BuildSeed(int n, SweepDirection dir)
                 if (left_qn > n) {
                     break;
                 }
-                right_idx = SearchQuantumN(qn_right, n - left_qn);
+                right_idx = SearchIndex(qn_right, n - left_qn);
                 if (right_idx == -1) {
                     continue;
                 }
@@ -414,14 +405,14 @@ void DMRGSystem::BuildSeed(int n, SweepDirection dir)
                         //cout << "left_size = " << left_size << " right_size = " << right_size << endl;
                         
                         vector<int> qn_r = QuantumN_kron(H0, BlockR[right_size].H);
-                        vector<int> qn_r_idx = sort_index(qn_r);
+                        vector<int> qn_r_idx = sort_index(qn_r, SortOrder::ASCENDING);
                         vector<size_t> size_r = SqueezeQuantumN(qn_r);
                         
-                        int block_right = SearchQuantumN(qn_r, n - qn);
+                        int block_right = SearchIndex(qn_r, n - qn);
                         
                         //cout << block_right << endl;
     
-                        int npsi_idx_right = b_begin(size_r, block_right) + k;
+                        int npsi_idx_right = BlockFirstIndex(size_r, block_right) + k;
                         
                         //cout << BlockR[right_size].H.total_d() << " " << BlockR[right_size].idx.size() << endl;
                         
@@ -435,18 +426,18 @@ void DMRGSystem::BuildSeed(int n, SweepDirection dir)
                         
                         int npsi_idx_left = BlockL[left_size - 1].H.begin(block_left) + j;
                         npsi_idx_left = d_per_site * npsi_idx_left + beta_idx;
-                        npsi_idx_left = SearchQuantumN(trans_idx_left, npsi_idx_left);
+                        npsi_idx_left = SearchIndex(trans_idx_left, npsi_idx_left);
                         
                         // order is important
-                        int npsi_block = SearchBlock(size_left, npsi_idx_left);
-                        int npsi_row = npsi_idx_left - b_begin(size_left, npsi_block);
+                        int npsi_block = SearchBlockIndex(size_left, npsi_idx_left);
+                        int npsi_row = npsi_idx_left - BlockFirstIndex(size_left, npsi_block);
                         npsi_block = npsi.SearchQuantumN(qn_left.at(npsi_block));
                         assert(npsi_block != -1);
         
                         
                         int npsi_col = npsi_idx_right % (int)total_d_right;
                         assert(npsi_col >= 0 && npsi_col < total_d_right);
-                        int r_block = SearchBlock(BlockR[right_size].H.block_size, npsi_col);
+                        int r_block = SearchBlockIndex(BlockR[right_size].H.block_size, npsi_col);
                         assert(BlockR[right_size].U.block[BlockR[right_size].U.SearchQuantumN(n - npsi.QuantumN[npsi_block])].rows() == BlockR[right_size].H.block_size[r_block]);
                         assert(npsi.block[npsi_block].cols() == BlockR[right_size].H.block_size[r_block]);
                         npsi_col = npsi_col - BlockR[right_size].H.begin(r_block);

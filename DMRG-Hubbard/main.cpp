@@ -20,8 +20,8 @@ using namespace Eigen;
 using namespace std;
 
 
-int main() {
-    
+int main()
+{
     int nsites, n_sweeps, n_states_to_keep, max_lanczos_iter;
     double hubbard_u, particles;
     double rel_err, truncation_error;
@@ -42,7 +42,6 @@ int main() {
     
     // Initialization
     DMRGSystem S(nsites, max_lanczos_iter, rel_err, hubbard_u);
-    S.sweep = false;
     // Warmup
     for (int n = 1; n < nsites/2; n++) {
         cout << "=== Warmup Iteration " << n << endl;
@@ -73,7 +72,7 @@ int main() {
 
             S.BuildBlockRight(nsites - iter - 2);
 
-            S.GroundState(particles, true);
+            S.GroundState(particles, false);
             S.Truncate(BlockPosition::LEFT, n_states_to_keep, truncation_error);
 
         }
