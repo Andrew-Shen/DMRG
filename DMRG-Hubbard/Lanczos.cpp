@@ -86,7 +86,7 @@ WavefunctionBlock InitializeWavefunction(const WavefunctionBlock& seed, WBType w
     return npsi;
 }
 
-double inner_product(WavefunctionBlock &v1, WavefunctionBlock &v2)
+double InnerProd(WavefunctionBlock &v1, WavefunctionBlock &v2)
 {
     assert(v1.quantumN_sector == v2.quantumN_sector && "WavefunctionBlock InnerProduct: Quantum numbers do not match! ");
     
@@ -143,9 +143,9 @@ double Lanczos(DMRGSystem &S, int n, int _max_iter, double _rel_err)
     
     SelfAdjointEigenSolver<MatrixXd> tsolver;
     for (int i = 1; i < max_iter; i++) {
-        wp[i] = symmetric_prod(S, v[i]);
+        wp[i] = SuperBlockProd(S, v[i]);
         
-        main_diag(i - 1) = inner_product(wp[i], v[i]);
+        main_diag(i - 1) = InnerProd(wp[i], v[i]);
 
         if (i == 1) {
             w[i] = wp[i] - v[i] * main_diag(i - 1);
@@ -186,9 +186,9 @@ double Lanczos(DMRGSystem &S, int n, int _max_iter, double _rel_err)
     
     tridiag.resize(max_iter, max_iter);
     tridiag = MatrixXd::Zero(max_iter, max_iter);
-    w[max_iter] = symmetric_prod(S, v[max_iter]);
+    w[max_iter] = SuperBlockProd(S, v[max_iter]);
     
-    main_diag(max_iter - 1) = inner_product(w[max_iter], v[max_iter]);
+    main_diag(max_iter - 1) = InnerProd(w[max_iter], v[max_iter]);
     for (int j = 0; j < max_iter - 2; j++) {
         tridiag(j, j) = main_diag(j);
         tridiag(j, j + 1) = super_diag(j);
@@ -207,7 +207,7 @@ double Lanczos(DMRGSystem &S, int n, int _max_iter, double _rel_err)
     
 }
 
-WavefunctionBlock symmetric_prod(DMRGSystem &S, WavefunctionBlock &psi)
+WavefunctionBlock SuperBlockProd(DMRGSystem &S, WavefunctionBlock &psi)
 {
     int left_size = S.left_size;
     int right_size = S.right_size;

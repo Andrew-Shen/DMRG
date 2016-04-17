@@ -25,12 +25,12 @@ WavefunctionBlock InitializeWavefunction(const vector<int>& quantumN_left, const
                                        const vector<size_t>& block_size_left, const vector<size_t>& block_size_right,
                                        int n, WBType wb_type);
 WavefunctionBlock InitializeWavefunction(const WavefunctionBlock& seed, WBType wb_type);
-double inner_product(WavefunctionBlock &v1, WavefunctionBlock &v2);
+double InnerProd(WavefunctionBlock &v1, WavefunctionBlock &v2);
 
 
 
 double Lanczos(DMRGSystem &S, int n, int _max_iter, double _rel_err);
-WavefunctionBlock symmetric_prod(DMRGSystem &S, WavefunctionBlock &psi);
+WavefunctionBlock SuperBlockProd(DMRGSystem &S, WavefunctionBlock &psi);
 
 
 double absl(double _a);
