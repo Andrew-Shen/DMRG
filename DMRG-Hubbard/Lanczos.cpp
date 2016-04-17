@@ -19,6 +19,45 @@
 using namespace Eigen;
 using namespace std;
 
+WavefunctionBlock initial_wavefunction(const vector<int>& quantumN_left, const vector<int>& quantumN_right,
+                                       const vector<size_t>& block_size_left, const vector<size_t>& block_size_right,
+                                       int n, WBType wb_type)
+{
+    WavefunctionBlock npsi;
+    npsi.quantumN_sector = n;
+    npsi.block.clear();
+    npsi.QuantumN.clear();
+    
+    for (int i = 0; i < quantumN_left.size(); i++) {
+        int qn_left = quantumN_left[i];
+        if (qn_left > n) {
+            break;
+        }
+        int block_idx_right = SearchIndex(quantumN_right, n - qn_left);
+        if (block_idx_right == -1) {
+            continue;
+        }
+        npsi.QuantumN.push_back(qn_left);
+        switch (wb_type) {
+            case WBType::RANDOM:
+                npsi.block.push_back(MatrixXd::Random(block_size_left[i], block_size_right[block_idx_right]));
+                break;
+            case WBType::ONES:
+                npsi.block.push_back(MatrixXd::Ones(block_size_left[i], block_size_right[block_idx_right]));
+                break;
+            case WBType::ZERO:
+                npsi.block.push_back(MatrixXd::Zero(block_size_left[i], block_size_right[block_idx_right]));
+                break;
+            default:
+                break;
+        }
+    }
+    if (wb_type != WBType::ZERO) {
+        npsi.normalize();
+    }
+    return npsi;
+}
+
 WavefunctionBlock initial_wavefunction(DMRGSystem &S, int n, WBType wb_type)
 {
     int left_size = S.left_size;
@@ -41,8 +80,6 @@ WavefunctionBlock initial_wavefunction(DMRGSystem &S, int n, WBType wb_type)
             continue;
         }
         npsi.QuantumN.push_back(left_qn);
-        S.BlockL[left_size].H.CheckConsistency();
-        S.BlockR[right_size].H.CheckConsistency();
         switch (wb_type) {
             case WBType::RANDOM:
                 npsi.block.push_back(MatrixXd::Random(S.BlockL[left_size].H.block[i].cols(),
@@ -55,6 +92,34 @@ WavefunctionBlock initial_wavefunction(DMRGSystem &S, int n, WBType wb_type)
             case WBType::ZERO:
                 npsi.block.push_back(MatrixXd::Zero(S.BlockL[left_size].H.block[i].cols(),
                                                     S.BlockR[right_size].H.block[right_idx].cols()));
+                break;
+            default:
+                break;
+        }
+    }
+    if (wb_type != WBType::ZERO) {
+        npsi.normalize();
+    }
+    return npsi;
+}
+
+WavefunctionBlock initial_wavefunction(const WavefunctionBlock& seed, WBType wb_type)
+{
+    WavefunctionBlock npsi(seed);
+    
+    for (int i = 0; i < seed.size(); i++) {
+        switch (wb_type) {
+            case WBType::RANDOM:
+                npsi.block[i] = MatrixXd::Random(seed.block[i].rows(),
+                                                 seed.block[i].cols());
+                break;
+            case WBType::ONES:
+                npsi.block[i] = MatrixXd::Ones(seed.block[i].rows(),
+                                               seed.block[i].cols());
+                break;
+            case WBType::ZERO:
+                npsi.block[i] = MatrixXd::Zero(seed.block[i].rows(),
+                                               seed.block[i].cols());
                 break;
             default:
                 break;
@@ -84,7 +149,7 @@ double inner_product(WavefunctionBlock &v1, WavefunctionBlock &v2)
     return res;
 }
 
-double Lanczos(DMRGSystem &S, int n, int _max_iter, double _rel_err, bool have_seed)
+double Lanczos(DMRGSystem &S, int n, int _max_iter, double _rel_err)
 {
     int max_iter;       // Max number of Lanczos iteration
     double rel_err;
@@ -115,18 +180,13 @@ double Lanczos(DMRGSystem &S, int n, int _max_iter, double _rel_err, bool have_s
     main_diag = VectorXd::Zero(max_iter + 1);
     super_diag.resize(max_iter + 1);
     super_diag = VectorXd::Zero(max_iter + 1);
-    v[0] = initial_wavefunction(S, n, WBType::ZERO);
     
-    // Wavefunction Prediction
-    if (have_seed == true) {
-        // seed must be normalized
-        v[1] = S.seed;
-    } else {
-        v[1] = initial_wavefunction(S, n, WBType::RANDOM);
-    }
+    v[0] = initial_wavefunction(S.seed, WBType::ZERO);
+    v[1] = S.seed;
+    
+    S.psi = initial_wavefunction(S.seed, WBType::ZERO);
     
     SelfAdjointEigenSolver<MatrixXd> tsolver;
-    S.psi = initial_wavefunction(S, n, WBType::ZERO);
     for (int i = 1; i < max_iter; i++) {
         wp[i] = symmetric_prod(S, v[i]);
         
@@ -191,7 +251,6 @@ double Lanczos(DMRGSystem &S, int n, int _max_iter, double _rel_err, bool have_s
     return es[max_iter - 1];
     
 }
-
 
 WavefunctionBlock symmetric_prod(DMRGSystem &S, WavefunctionBlock &psi)
 {

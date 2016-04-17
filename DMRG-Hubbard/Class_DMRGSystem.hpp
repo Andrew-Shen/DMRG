@@ -19,6 +19,7 @@ using namespace Eigen;
 using namespace std;
 
 enum class SweepDirection {WR, L2R, R2L};
+enum class FailSolution {RAND, TRUNC};
 
 class DMRGSystem
 {
@@ -54,15 +55,18 @@ public:
     int left_size;
     
     SweepDirection state;
+    FailSolution sol;
     
     DMRGSystem(int _nsites, int _max_lanczos_iter, double _rel_err, double u);
    
-    void BuildBlockLeft(int _iter);
-    void BuildBlockRight(int _iter);
-    void GroundState(int n, bool wf_prediction);
+    void WarmUp(int n_states_to_keep, double truncation_error);
+    void Sweep(int total_QN, int n_sweeps, int n_states_to_keep, double truncation_error);
+    
+    void BuildSeed(int n);
+    void BuildBlock(BlockPosition _position);
+    void GroundState(int n);
     double Truncate(BlockPosition _position, int _max_m, double _trun_err);
     //void Measure();
-    void BuildSeed(int n);
 };
 
 /*
