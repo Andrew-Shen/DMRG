@@ -159,7 +159,7 @@ double Lanczos(DMRGSystem &S, int n, int _max_iter, double _rel_err, bool have_s
         
         if (absl(es[i - 1] - es[i - 2]) < rel_err ) {
             for (int j = 0; j < i; j++) {
-            S.psi = S.psi + v[j + 1] * tsolver.eigenvectors()(j,0);
+            S.psi += v[j + 1] * tsolver.eigenvectors()(j,0);
             }
             cout << "Lancozs iteration: " << i << endl;
             

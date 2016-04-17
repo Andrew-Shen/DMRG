@@ -122,7 +122,7 @@ public:
     WavefunctionBlock& operator*=(double n);
     WavefunctionBlock& operator/=(double n);
     
-    void Truncation(OperatorBlock& U, BlockPosition pos);
+    void Truncate(OperatorBlock& U, BlockPosition pos, bool transposed);
 };
 
 class DMRGBlock

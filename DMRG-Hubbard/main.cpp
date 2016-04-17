@@ -27,8 +27,8 @@ int main()
     double rel_err, truncation_error;
 
     // DMRG Parameters
-    nsites = 20;
-    n_sweeps = 3;
+    nsites = 18;
+    n_sweeps = 10;
 
     n_states_to_keep = 500;
     max_lanczos_iter = 100;
@@ -49,48 +49,81 @@ int main()
         S.BuildBlockLeft(n);
         S.BuildBlockRight(n);
 
-        cout << "Total particle number " << 2 * n + 2 << endl;
         S.GroundState(2 * n + 2, false);
-        
+
         S.Truncate(BlockPosition::LEFT, n_states_to_keep, truncation_error);
         S.Truncate(BlockPosition::RIGHT, n_states_to_keep, truncation_error);
+        
+        //cout << S.left_size << " " << S.right_size << endl;
+        //cout << "left block" << endl;
+        //S.BlockL[S.left_size].H.PrintInformation();
+        //cout << "right block" << endl;
+        //S.BlockR[S.right_size].H.PrintInformation();
+
     }
+
     // Sweep
     cout << "=== Start sweeps" << endl;
     int first_iter = 0.5 * nsites;
     for (int sweep = 1; sweep <= n_sweeps; sweep++) {
         // this is ugly
-        if (first_iter == 1) {
-            S.left_size = 0;
-            S.right_size = nsites - 2;
-        }
+        S.left_size = first_iter - 1;
+        S.right_size = nsites - 2 - S.left_size;
+        S.state = SweepDirection::L2R;
         for (int iter = first_iter; iter < nsites - 2; iter++) { // why must n-2 to predict wavefunction
             cout << "=== Left-to-right Iteration " << iter << endl;
-            S.state = SweepDirection::L2R;
-
+            
             S.BuildSeed(particles);
+            
             S.BuildBlockLeft(iter);
-
             S.BuildBlockRight(nsites - iter - 2);
+            
+            //cout << S.left_size << " " << S.right_size << endl;
+            //cout << "left block" << endl;
+            //S.BlockL[S.left_size].H.PrintInformation();
+            //cout << "right block" << endl;
+            //S.BlockR[S.right_size].H.PrintInformation();
 
             S.GroundState(particles, true);
+
             S.Truncate(BlockPosition::LEFT, n_states_to_keep, truncation_error);
+            
+            
+            //cout << "left U block" << endl;
+            //S.BlockL[S.left_size].U.PrintInformation();
 
         }
+        // this is ugly
+        S.left_size = nsites - 2;
+        S.right_size = 0;
         first_iter = 1;
+        S.state = SweepDirection::R2L;
         for (int iter = first_iter; iter < nsites - 2; iter++) {
             cout << "=== Right-to-left Iteration " << iter << endl;
-            S.state = SweepDirection::R2L;
+            S.BuildSeed(particles);
+            
             S.BuildBlockLeft(nsites - iter - 2);
             S.BuildBlockRight(iter);
-            //S.BuildSeed(R2L);
-            S.GroundState(particles, false);
+
+            //cout << S.left_size << " " << S.right_size << endl;
+            //cout << "left block" << endl;
+            //S.BlockL[S.left_size].H.PrintInformation();
+            //cout << "right block" << endl;
+            //S.BlockR[S.right_size].H.PrintInformation();
+            
+            S.GroundState(particles, true);
             /*
             if (iter == 0.5 * nsites) {
                 S.Measure();
             }
              */
+            //cout << S.left_size << " " << S.right_size << endl;
+
             S.Truncate(BlockPosition::RIGHT, n_states_to_keep, truncation_error);
+
+            
+            //cout << "right U block" << endl;
+            //S.BlockR[S.right_size].U.PrintInformation();
 
         }
         

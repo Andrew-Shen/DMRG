@@ -330,8 +330,9 @@ void OperatorBlock::CheckConsistency()
 {
     size_t dqn = QuantumN.size();
     assert(dqn == block.size() && "OperatorBlock: An inconsistency in the quantum number and the actual block. ");
-    assert(dqn == block_size.size() && "OperatorBlock: Quantum number and block size do not agree! ");
+    //assert(dqn == block_size.size() && "OperatorBlock: Quantum number and block size do not agree! ");
     
+    /*
     for (int i = 0; i < dqn; i++) {
         if (block[i].cols() != block[i].rows()) {
             cout << "OperatorBlock: A non-square block! " << endl;
@@ -341,6 +342,7 @@ void OperatorBlock::CheckConsistency()
             cout << "OperatorBlock: A block with zero size encountered. OperatorBlock::ZeroPurification is recommended. " << endl;
         }
     }
+     */
 }
 
 void OperatorBlock::PrintInformation()
@@ -351,11 +353,11 @@ void OperatorBlock::PrintInformation()
     PrintVector(QuantumN);
     cout << "Corresponding matrix size: " << endl;
     PrintVector(block_size);
-    cout << "Operator Blocks: " << endl;
-    for (int i = 0; i < this -> size(); i++) {
-        cout << "Block " << i << ", Quantum number: " << QuantumN[i] << endl;
-        cout << block[i] << endl;
-    }
+    //cout << "Operator Blocks: " << endl;
+    //for (int i = 0; i < size(); i++) {
+    //    cout << "Block " << i << ", Quantum number: " << QuantumN[i] << endl;
+    //    cout << block[i] << endl;
+    //}
     cout << "=========================" << endl;
 }
 
@@ -583,7 +585,7 @@ WavefunctionBlock& WavefunctionBlock::operator/=(double n)
     return *this;
 }
 
-void WavefunctionBlock::Truncation(OperatorBlock& U, BlockPosition pos)
+void WavefunctionBlock::Truncate(OperatorBlock& U, BlockPosition pos, bool transposed)
 {
     MatrixXd tmat;
     int U_idx;
@@ -591,15 +593,22 @@ void WavefunctionBlock::Truncation(OperatorBlock& U, BlockPosition pos)
         if (pos == BlockPosition::LEFT) {
             U_idx = U.SearchQuantumN(QuantumN[i]);
             assert(U_idx != -1 && "WavefunctionBlock: Corresponding quantum number not found! ");
-            tmat = U.block[U_idx] * block[i];
+            if (transposed == true) {
+                tmat = U.block[U_idx].transpose() * block[i];
+            } else {
+                tmat = U.block[U_idx] * block[i];
+            }
         } else {
             U_idx = U.SearchQuantumN(quantumN_sector - QuantumN[i]);
             assert(U_idx != -1 && "WavefunctionBlock: Corresponding quantum number not found! ");
-            tmat = block[i] * U.block[U_idx];
+            if (transposed == true) {
+                tmat = block[i] * U.block[U_idx].transpose();
+            } else {
+                tmat = block[i] * U.block[U_idx];
+            }
         }
         block[i] = tmat;
     }
-    
     // Zero purification
     vector<int>::iterator it_qn = QuantumN.begin();
     
