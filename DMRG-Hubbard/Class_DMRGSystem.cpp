@@ -184,7 +184,7 @@ void DMRGSystem::BuildSeed(int n)
     vector<size_t> block_size_right = SqueezeQuantumN(quantumN_right);
     
     if (state == SweepDirection::WR) {
-        seed = initial_wavefunction(quantumN_left, quantumN_right,
+        seed = InitializeWavefunction(quantumN_left, quantumN_right,
                                     block_size_left, block_size_right,
                                     n, WBType::RANDOM);
     } else {
@@ -223,7 +223,7 @@ void DMRGSystem::BuildSeed(int n)
                 if (sol == FailSolution::RAND) {
                     cout << "Wavefunction transformation failed! Will use random Lanczos seed. " << endl;
                     wf_transformation = false;
-                    seed = initial_wavefunction(quantumN_left, quantumN_right,
+                    seed = InitializeWavefunction(quantumN_left, quantumN_right,
                                                 block_size_left, block_size_right,
                                                 n, WBType::RANDOM);
                     break;

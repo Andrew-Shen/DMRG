@@ -21,10 +21,10 @@ using namespace std;
 
 enum class WBType {RANDOM, ZERO, ONES};
 
-WavefunctionBlock initial_wavefunction(const vector<int>& quantumN_left, const vector<int>& quantumN_right,
+WavefunctionBlock InitializeWavefunction(const vector<int>& quantumN_left, const vector<int>& quantumN_right,
                                        const vector<size_t>& block_size_left, const vector<size_t>& block_size_right,
                                        int n, WBType wb_type);
-WavefunctionBlock initial_wavefunction(const WavefunctionBlock& seed, WBType wb_type);
+WavefunctionBlock InitializeWavefunction(const WavefunctionBlock& seed, WBType wb_type);
 double inner_product(WavefunctionBlock &v1, WavefunctionBlock &v2);
 
 
