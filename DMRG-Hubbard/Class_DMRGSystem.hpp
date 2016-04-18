@@ -64,7 +64,7 @@ public:
     
     void BuildSeed(int n);
     void BuildBlock(BlockPosition _position);
-    void GroundState(int n);
+    void GroundState();
     double Truncate(BlockPosition _position, int _max_m, double _trun_err);
     //void Measure();
 };

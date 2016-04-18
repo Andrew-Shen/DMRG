@@ -461,11 +461,11 @@ void WavefunctionBlock::PrintInformation()
     cout << size() << " blocks, with total quantum number: " << endl;
     PrintVector(QuantumN);
     cout << "Norm of this WavefunctionBlock: " << this -> norm() << endl;
-    cout << "Wavefunction Blocks: " << endl;
-    for (int i = 0; i < size(); i++) {
-        cout << "Block " << i << ", Quantum number: " << QuantumN[i] << endl;
-        cout << block[i] << endl;
-    }
+    //cout << "Wavefunction Blocks: " << endl;
+    //for (int i = 0; i < size(); i++) {
+    //    cout << "Block " << i << ", Quantum number: " << QuantumN[i] << endl;
+    //    cout << block[i] << endl;
+    //}
 }
 
 double WavefunctionBlock::norm()

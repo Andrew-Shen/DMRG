@@ -104,7 +104,7 @@ double InnerProd(WavefunctionBlock &v1, WavefunctionBlock &v2)
     return res;
 }
 
-double Lanczos(DMRGSystem &S, int n, int _max_iter, double _rel_err)
+double Lanczos(DMRGSystem &S, int _max_iter, double _rel_err)
 {
     int max_iter;       // Max number of Lanczos iteration
     double rel_err;
@@ -168,6 +168,7 @@ double Lanczos(DMRGSystem &S, int n, int _max_iter, double _rel_err)
         tridiag.diagonal(-1) = tridiag.diagonal(1);
         tsolver.compute(tridiag);
         if (tsolver.info() != Success) {
+            cout << tridiag << endl;
             abort();
         }
         es[i - 1] = tsolver.eigenvalues()(0);

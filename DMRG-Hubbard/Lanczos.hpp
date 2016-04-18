@@ -29,7 +29,7 @@ double InnerProd(WavefunctionBlock &v1, WavefunctionBlock &v2);
 
 
 
-double Lanczos(DMRGSystem &S, int n, int _max_iter, double _rel_err);
+double Lanczos(DMRGSystem &S, int _max_iter, double _rel_err);
 WavefunctionBlock SuperBlockProd(DMRGSystem &S, WavefunctionBlock &psi);
 
 

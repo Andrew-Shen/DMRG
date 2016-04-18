@@ -89,14 +89,14 @@ void DMRGSystem::WarmUp(int n_states_to_keep, double truncation_error)
     for (int n = 1; n < nsites / 2; n++) {
         cout << "=== Warmup: Iteration " << n << " ===" << endl;
         
-        BuildSeed(2 * n + 2);
+        BuildSeed((2 * n + 2) * 0.8);
         
         cout << "Block Size: Left = " << left_size << ", Right = " << right_size << endl;
 
         BuildBlock(BlockPosition::LEFT);
         BuildBlock(BlockPosition::RIGHT);
         
-        GroundState(2 * n + 2);
+        GroundState();
         
         Truncate(BlockPosition::LEFT, n_states_to_keep, truncation_error);
         Truncate(BlockPosition::RIGHT, n_states_to_keep, truncation_error);
@@ -123,7 +123,7 @@ void DMRGSystem::Sweep(int total_QN, int n_sweeps, int n_states_to_keep, double 
         BuildBlock(BlockPosition::LEFT);
         BuildBlock(BlockPosition::RIGHT);
         
-        GroundState(total_QN);
+        GroundState();
         
         if (state == SweepDirection::L2R) {
             Truncate(BlockPosition::LEFT, n_states_to_keep, truncation_error);
@@ -138,11 +138,9 @@ void DMRGSystem::Sweep(int total_QN, int n_sweeps, int n_states_to_keep, double 
             Truncate(BlockPosition::RIGHT, n_states_to_keep, truncation_error);
             if (right_size == nsites - 3) {
                 state = SweepDirection::L2R;
+                // for the effectiveness of wavefunction transformation
                 left_size --;
                 right_size ++;
-                // for the effectiveness of wavefunction transformation
-                left_size ++;
-                right_size --;
             }
         }
     }
@@ -186,11 +184,12 @@ void DMRGSystem::BuildSeed(int n)
     if (state == SweepDirection::WR) {
         seed = InitializeWavefunction(quantumN_left, quantumN_right,
                                     block_size_left, block_size_right,
-                                    n, WBType::RANDOM);
+                                    n, WBType::ONES);
     } else {
         if ((left_size == 1 && state == SweepDirection::L2R) ||
             (right_size == 1 && state == SweepDirection::R2L)) {
             seed = psi;
+            wf_transformation = false;
         } else {
             wf_transformation = true;
 
@@ -243,6 +242,7 @@ void DMRGSystem::BuildSeed(int n)
         }
     }
     
+    
     if (wf_transformation == true) {
         if (state == SweepDirection::L2R) {
             // A note on the notation:
@@ -261,21 +261,27 @@ void DMRGSystem::BuildSeed(int n)
                 int block_idx_l = BlockL[left_size - 1].H.SearchQuantumN(qn_l);
                 int block_idx_r = SearchIndex(quantumN_r, n - qn_l);
                 
+                assert(block_idx_l != -1 && block_idx_r != -1);
+                
                 for (int j = 0; j < psi.block[i].rows(); j++) {
                     for (int k = 0; k < psi.block[i].cols(); k++) {
-                        int idx_r = BlockR[right_size + 1].idx[BlockFirstIndex(block_size_r, block_idx_r) + k];
+                        assert(BlockR[right_size + 1].idx == trans_idx_r);
+                        int idx_r = trans_idx_r.at(BlockFirstIndex(block_size_r, block_idx_r) + k);
+                        
                         int idx_right = idx_r % (int)total_d_right;
                         
                         double idx_site = (idx_r - idx_right) / total_d_right;
-                        //assert(idx_site >= 0 && idx_site < d_per_site && floor(idx_site) == idx_site);
+                        assert(idx_site >= 0 && idx_site < d_per_site && floor(idx_site) == idx_site);
                         
                         int idx_left = SearchIndex(trans_idx_left, d_per_site * (BlockL[left_size - 1].H.BlockFirstIdx(block_idx_l) + j) + idx_site);
                         
                         int block_idx_left = SearchBlockIndex(block_size_left, idx_left);
-                        //assert(npsi.SearchQuantumN(quantumN_left[block_idx_left]) != -1);
+                        assert(npsi.SearchQuantumN(quantumN_left[block_idx_left]) != -1);
                         int block_idx_right = SearchBlockIndex(BlockR[right_size].H.block_size, idx_right);
                         
                         int npsi_block = npsi.SearchQuantumN(quantumN_left[block_idx_left]);
+                        
+                        assert(npsi.QuantumN[npsi_block] == n - BlockR[right_size].H.QuantumN[block_idx_right]);
                         assert(npsi.block[npsi_block].cols() == BlockR[right_size].H.block_size[block_idx_right]);
                         int npsi_row = idx_left - BlockFirstIndex(block_size_left, block_idx_left);
                         int npsi_col = idx_right - BlockR[right_size].H.BlockFirstIdx(block_idx_right);
@@ -394,11 +400,11 @@ void DMRGSystem::BuildBlock(BlockPosition _position)
     }
 }
 
-void DMRGSystem::GroundState(int n)
+void DMRGSystem::GroundState()
 {
-    cout << "Total particle number " << n << endl;
-    double ev = Lanczos(*this, n, max_lanczos_iter, rel_err);
-    cout << "Energy per site: " << std::setprecision(12) << ev / n  << endl;
+    cout << "Total quantum number sector: " << psi.quantumN_sector << endl;
+    double ev = Lanczos(*this, max_lanczos_iter, rel_err);
+    cout << "Energy per site: " << std::setprecision(12) << ev / psi.quantumN_sector << endl;
 }
 
 double DMRGSystem::Truncate(BlockPosition _position, int _max_m, double _trun_err)
