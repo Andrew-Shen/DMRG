@@ -82,14 +82,17 @@ DMRGSystem::DMRGSystem(int _nsites, int _max_lanczos_iter, double _rel_err, doub
     }
 }
 
-void DMRGSystem::WarmUp(int n_states_to_keep, double truncation_error)
+void DMRGSystem::WarmUp(int total_QN, int n_states_to_keep, double truncation_error)
 {
     state = SweepDirection::WR;
 
+    double density = total_QN;
+    density /= nsites;
+    
     for (int n = 1; n < nsites / 2; n++) {
         cout << "=== Warmup: Iteration " << n << " ===" << endl;
         
-        BuildSeed((2 * n + 2) * 0.8);
+        BuildSeed((2 * n + 2) * density);
         
         cout << "Block Size: Left = " << left_size << ", Right = " << right_size << endl;
 
@@ -127,10 +130,11 @@ void DMRGSystem::Sweep(int total_QN, int n_sweeps, int n_states_to_keep, double 
         
         if (state == SweepDirection::L2R) {
             Truncate(BlockPosition::LEFT, n_states_to_keep, truncation_error);
+            // if there is wavefuncation transformation, the sweep must not return until the end
             if (left_size == nsites - 3) {
                 state = SweepDirection::R2L;
                 sweep ++;
-                // for the effectiveness of wavefunction transformation
+
                 left_size ++;
                 right_size --;
             }
@@ -138,7 +142,7 @@ void DMRGSystem::Sweep(int total_QN, int n_sweeps, int n_states_to_keep, double 
             Truncate(BlockPosition::RIGHT, n_states_to_keep, truncation_error);
             if (right_size == nsites - 3) {
                 state = SweepDirection::L2R;
-                // for the effectiveness of wavefunction transformation
+
                 left_size --;
                 right_size ++;
             }

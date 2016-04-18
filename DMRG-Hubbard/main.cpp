@@ -41,7 +41,7 @@ int main()
         
     DMRGSystem S(nsites, max_lanczos_iter, rel_err, hubbard_u);
     
-    S.WarmUp(n_states_to_keep, truncation_error);
+    S.WarmUp(particles, n_states_to_keep, truncation_error);
 
     S.Sweep(particles, n_sweeps, n_states_to_keep, truncation_error);
 

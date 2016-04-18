@@ -59,7 +59,7 @@ public:
     
     DMRGSystem(int _nsites, int _max_lanczos_iter, double _rel_err, double u);
    
-    void WarmUp(int n_states_to_keep, double truncation_error);
+    void WarmUp(int total_QN, int n_states_to_keep, double truncation_error);
     void Sweep(int total_QN, int n_sweeps, int n_states_to_keep, double truncation_error);
     
     void BuildSeed(int n);
