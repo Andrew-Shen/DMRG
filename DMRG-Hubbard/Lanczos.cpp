@@ -235,9 +235,9 @@ WavefunctionBlock SuperBlockProd(DMRGSystem &S, WavefunctionBlock &psi)
     }
     
     // c_L^dag c_R
-    int wb_idx;
+    int wb_idx, fermion_sign;
     for (int i = 0; i < psi.size(); i++) {
-        int fermion_sign = 1;
+        fermion_sign = 1;
         left_qn = psi.QuantumN[i];
         left_idx = S.BlockL[left_size].H.SearchQuantumN(left_qn);
         right_idx = S.BlockR[right_size].H.SearchQuantumN(n - left_qn - 1);
@@ -247,14 +247,12 @@ WavefunctionBlock SuperBlockProd(DMRGSystem &S, WavefunctionBlock &psi)
             continue;
         }
         
-        if (S.fermion == true) {
-            if (!(S.BlockR[right_size].H.QuantumN[S.BlockR[right_size].H.SearchQuantumN(n - left_qn)] % 2)) {
+        if (fermion_sign == true) {
+            if (S.BlockR[right_size].H.QuantumN[right_idx] % 2) {
                 fermion_sign = -1;
             }
         }
         
-        assert(wb_idx == i + 1);
-    
         tmat = S.BlockL[left_size].c_up[left_size].block[left_idx].transpose() * psi.block[i];
         tmat *= fermion_sign;
         npsi.block[wb_idx] += tmat * S.BlockR[right_size].c_up[right_size].block[right_idx].transpose();
@@ -265,7 +263,7 @@ WavefunctionBlock SuperBlockProd(DMRGSystem &S, WavefunctionBlock &psi)
     
     // c_R^dag c_L
     for (int i = 0; i < psi.size(); i++) {
-        int fermion_sign = 1;
+        fermion_sign = 1;
         left_qn = psi.QuantumN[i];
         left_idx = S.BlockL[left_size].H.SearchQuantumN(left_qn - 1);
         right_idx = S.BlockR[right_size].H.SearchQuantumN(n - left_qn);
@@ -275,15 +273,12 @@ WavefunctionBlock SuperBlockProd(DMRGSystem &S, WavefunctionBlock &psi)
             continue;
         }
         
-        if (S.fermion == true) {
-            // notice the additional ! sign
-            if ((S.BlockR[right_size].H.QuantumN[S.BlockR[right_size].H.SearchQuantumN(n - left_qn)] % 2)) {
+        if (fermion_sign == true) {
+            if (S.BlockR[right_size].H.QuantumN[right_idx] % 2) {
                 fermion_sign = -1;
             }
         }
         
-        assert(wb_idx == i - 1);
-
         tmat = S.BlockL[left_size].c_up[left_size].block[left_idx] * psi.block[i];
         tmat *= fermion_sign;
         npsi.block[wb_idx] += tmat * S.BlockR[right_size].c_up[right_size].block[right_idx];

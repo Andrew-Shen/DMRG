@@ -24,7 +24,11 @@ using namespace std;
 DMRGSystem::DMRGSystem(int _nsites, int _max_lanczos_iter, double _rel_err, double u)
 {
     sol = FailSolution::TRUNC;
+    
     fermion = false;
+    // Definition of the fermion order: (example)
+    // c_up^dag[4] c_down^dag[4] c_up^dag[3] c_down^dag[3] |0>
+    // where 0 -> 4 is left -> right
     
     left_size = 0;
     right_size = 0;
@@ -50,7 +54,12 @@ DMRGSystem::DMRGSystem(int _nsites, int _max_lanczos_iter, double _rel_err, doub
     c_up0(0,1) = 1.0;
     c_up0(2,3) = 1.0;
     c_down0(0,2) = 1.0;
-    c_down0(1,3) = 1.0;
+    if (fermion == true) {
+        // this comes from the definition of fermion order above
+        c_down0(1,3) = -1.0;
+    } else {
+        c_down0(1,3) = 1.0;
+    }
     u0(3,3) = 1.0;
     u0 = u * u0;
 
@@ -73,13 +82,19 @@ DMRGSystem::DMRGSystem(int _nsites, int _max_lanczos_iter, double _rel_err, doub
     BlockL[0].c_down[0].UpdateBlock(c_down0);
     BlockR[0].c_down[0] = BlockL[0].c_down[0];
     
-    // basical information
+
     cout << "DMRG System initialized " << endl;
     cout << "Wavefunction transformation fail solution: ";
     if (sol == FailSolution::TRUNC) {
         cout << "Omit basis" << endl;
     } else {
         cout << "Random seed" << endl;
+    }
+    cout << "Particle statistics: ";
+    if (fermion == true) {
+        cout << "Fermion" << endl;
+    } else {
+        cout << "Boson" << endl;
     }
 }
 
@@ -247,7 +262,6 @@ void DMRGSystem::BuildSeed(int n)
         }
     }
     
-    
     if (wf_transformation == true) {
         if (state == SweepDirection::L2R) {
             // A note on the notation:
@@ -266,28 +280,21 @@ void DMRGSystem::BuildSeed(int n)
                 int block_idx_l = BlockL[left_size - 1].H.SearchQuantumN(qn_l);
                 int block_idx_r = SearchIndex(quantumN_r, n - qn_l);
                 
-                assert(block_idx_l != -1 && block_idx_r != -1);
-                
                 for (int j = 0; j < psi.block[i].rows(); j++) {
                     for (int k = 0; k < psi.block[i].cols(); k++) {
-                        assert(BlockR[right_size + 1].idx == trans_idx_r);
                         int idx_r = trans_idx_r.at(BlockFirstIndex(block_size_r, block_idx_r) + k);
                         
                         int idx_right = idx_r % (int)total_d_right;
                         
                         double idx_site = (idx_r - idx_right) / total_d_right;
-                        assert(idx_site >= 0 && idx_site < d_per_site && floor(idx_site) == idx_site);
+                        //assert(idx_site >= 0 && idx_site < d_per_site && floor(idx_site) == idx_site);
                         
                         int idx_left = SearchIndex(trans_idx_left, d_per_site * (BlockL[left_size - 1].H.BlockFirstIdx(block_idx_l) + j) + idx_site);
                         
                         int block_idx_left = SearchBlockIndex(block_size_left, idx_left);
-                        assert(npsi.SearchQuantumN(quantumN_left[block_idx_left]) != -1);
                         int block_idx_right = SearchBlockIndex(BlockR[right_size].H.block_size, idx_right);
                         
                         int npsi_block = npsi.SearchQuantumN(quantumN_left[block_idx_left]);
-                        
-                        assert(npsi.QuantumN[npsi_block] == n - BlockR[right_size].H.QuantumN[block_idx_right]);
-                        assert(npsi.block[npsi_block].cols() == BlockR[right_size].H.block_size[block_idx_right]);
                         int npsi_row = idx_left - BlockFirstIndex(block_size_left, block_idx_left);
                         int npsi_col = idx_right - BlockR[right_size].H.BlockFirstIdx(block_idx_right);
                         npsi.block[npsi_block](npsi_row, npsi_col) = psi.block[i](j, k);
@@ -314,7 +321,7 @@ void DMRGSystem::BuildSeed(int n)
                 
                 for (int j = 0; j < psi.block[i].rows(); j++) {
                     for (int k = 0; k < psi.block[i].cols(); k++) {
-                        int idx_l = BlockL[left_size + 1].idx[BlockFirstIndex(block_size_l, block_idx_l) + j];
+                        int idx_l = trans_idx_l[BlockFirstIndex(block_size_l, block_idx_l) + j];
                         int idx_site = idx_l % d_per_site;
                         
                         double idx_left = (idx_l - idx_site) / d_per_site;
@@ -382,15 +389,12 @@ void DMRGSystem::BuildBlock(BlockPosition _position)
         c_downL = kroneckerProduct(I_left, c_down0);
         MatrixReorder(c_downL, BlockL[left_size].idx);
         BlockL[left_size].c_down[left_size].UpdateBlock(c_downL);
-
     } else {
         MatrixXd HR = BlockR[right_size - 1].H.FullOperator();
         MatrixXd c_upR = BlockR[right_size - 1].c_up[right_size - 1].FullOperator();
         MatrixXd c_downR = BlockR[right_size - 1].c_down[right_size - 1].FullOperator();
         
         size_t dim_r = HR.cols();
-        
-        //assert(dim_r == c_upR.cols() && "BuildBlock: Dimensions are not properly set in the last iteration! ");
         
         MatrixXd I_right = MatrixXd::Identity(dim_r, dim_r);
         MatrixXd I_site = MatrixXd::Identity(d_per_site, d_per_site);
@@ -537,7 +541,7 @@ double DMRGSystem::Truncate(BlockPosition _position, int _max_m, double _trun_er
         BlockL[left_size].c_up[left_size].RhoPurification(rho);
         BlockL[left_size].c_down[left_size].RhoPurification(rho);
         for (int i = 0; i < n_blocks - 1; i++) {
-            assert(BlockL[left_size].c_up[left_size].QuantumN[i] == BlockL[left_size].U.QuantumN[i]);
+            //assert(BlockL[left_size].c_up[left_size].QuantumN[i] == BlockL[left_size].U.QuantumN[i]);
             BlockL[left_size].c_up[left_size].block_size[i] = rho_evec[i].cols();
             BlockL[left_size].c_down[left_size].block_size[i] = rho_evec[i].cols();
 
