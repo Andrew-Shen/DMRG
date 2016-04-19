@@ -25,7 +25,7 @@ DMRGSystem::DMRGSystem(int _nsites, int _max_lanczos_iter, double _rel_err, doub
 {
     sol = FailSolution::TRUNC;
     
-    fermion = false;
+    fermion = true;
     // Definition of the fermion order: (example)
     // c_up^dag[4] c_down^dag[4] c_up^dag[3] c_down^dag[3] |0>
     // where 0 -> 4 is left -> right

@@ -66,7 +66,6 @@ public:
     int BlockFirstIdx(int idx);
     int BlockLastIdx(int idx);
     MatrixXd IdentitySign();
-    MatrixXd IdentitySign(int n);
     
     // For debug
     void CheckConsistency();

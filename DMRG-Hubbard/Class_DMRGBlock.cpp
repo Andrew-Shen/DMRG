@@ -293,19 +293,6 @@ MatrixXd OperatorBlock::IdentitySign()
     return tmat;
 }
 
-MatrixXd OperatorBlock::IdentitySign(int n)
-{
-    assert(n >= 0 && n < size());
-    
-    int sign = 1;
-    if (QuantumN[n] % 2) {
-        sign = -1;
-    }
-    
-    size_t d = block_size[n];
-    return (sign * MatrixXd::Identity(d, d));
-}
-
 MatrixXd OperatorBlock::FullOperator() const
 {
     MatrixXd tmat;
