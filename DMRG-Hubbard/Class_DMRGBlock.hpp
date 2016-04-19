@@ -22,7 +22,7 @@ enum class SortOrder {ASCENDING, DESCENDING};
 
 template <typename Type> void PrintVector(Type &vec);
 
-MatrixXd MatrixDirectPlus(MatrixXd &m1, MatrixXd &m2);
+MatrixXd MatrixDirectPlus(const MatrixXd &m1, const MatrixXd &m2);
 void MatrixReorder(MatrixXd &m, vector<int> &vec_idx);
 
 template <typename Type> vector<int> SortIndex(Type &vec, SortOrder so);
@@ -51,8 +51,8 @@ public:
     void UpdateBlock(const MatrixXd &m);
     int SearchQuantumN(int n) const;
 
-    MatrixXd FullOperator();
-    vector<int> FullQuantumN();
+    MatrixXd FullOperator() const;
+    vector<int> FullQuantumN() const;
     
     // Only for square blocks
     size_t total_d()
@@ -65,13 +65,14 @@ public:
     }
     int BlockFirstIdx(int idx);
     int BlockLastIdx(int idx);
+    MatrixXd IdentitySign();
     
     // For debug
     void CheckConsistency();
     void PrintInformation();
 };
 
-vector<int> KronQuantumN(OperatorBlock &ob1, OperatorBlock &ob2);
+vector<int> KronQuantumN(const OperatorBlock &ob1, const OperatorBlock &ob2);
 vector<size_t> SqueezeQuantumN(vector<int> &qn);
 int SearchIndex(const vector<int>& qn, int n);
 int BlockFirstIndex(const vector<size_t>& block_size, int idx);

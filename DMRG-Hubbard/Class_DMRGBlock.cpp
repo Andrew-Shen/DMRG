@@ -29,7 +29,7 @@ template void PrintVector(const vector<int> &vec);
 template void PrintVector(const vector<double> &vec);
 template void PrintVector(const vector<size_t> &vec);
 
-MatrixXd MatrixDirectPlus(MatrixXd &m1, MatrixXd &m2)
+MatrixXd MatrixDirectPlus(const MatrixXd &m1, const MatrixXd &m2)
 {
     size_t row_m1 = m1.rows();
     size_t row_m2 = m2.rows();
@@ -98,7 +98,7 @@ template vector<int> SortIndex<vector<int>>(vector<int> &vec, SortOrder so);
 template vector<int> SortIndex<vector<double>>(vector<double> &vec, SortOrder so);
 
 
-vector<int> KronQuantumN(OperatorBlock &ob1, OperatorBlock &ob2)
+vector<int> KronQuantumN(const OperatorBlock &ob1, const OperatorBlock &ob2)
 {
     vector<int> kron_qn;
     
@@ -110,7 +110,7 @@ vector<int> KronQuantumN(OperatorBlock &ob1, OperatorBlock &ob2)
     
     for (int i = 0; i < d1; i++) {
         for (int j = 0; j < d2; j++) {
-            kron_qn.push_back(qn1.at(i) + qn2.at(j));
+            kron_qn.push_back(qn1[i] + qn2[j]);
         }
     }
     
@@ -242,9 +242,9 @@ void OperatorBlock::RhoPurification(const OperatorBlock &rho)
         }
         else
         {
-            it_block++;
-            it_qn++;
-            it_bs++;
+            it_block ++;
+            it_qn ++;
+            it_bs ++;
         }
     }
     
@@ -275,24 +275,43 @@ void OperatorBlock::ZeroPurification()
     }
 }
 
-MatrixXd OperatorBlock::FullOperator()
+MatrixXd OperatorBlock::IdentitySign()
 {
     MatrixXd tmat;
     
-    for (int i = 0; i < this -> size(); i++) {
-        tmat.noalias() = MatrixDirectPlus(tmat, block.at(i));
+    for (int i = 0; i < size(); i++) {
+        size_t d = block_size[i];
+        MatrixXd tmat2 = MatrixXd::Identity(d, d);
+        if (QuantumN[i] % 2) {
+            tmat2 *= -1;
+            tmat.noalias() = MatrixDirectPlus(tmat, tmat2);
+        } else {
+            tmat.noalias() = MatrixDirectPlus(tmat, tmat2);
+        }
+    }
+    
+    return tmat;
+
+}
+
+MatrixXd OperatorBlock::FullOperator() const
+{
+    MatrixXd tmat;
+    
+    for (int i = 0; i < size(); i++) {
+        tmat.noalias() = MatrixDirectPlus(tmat, block[i]);
     }
     
     return tmat;
 }
 
-vector<int> OperatorBlock::FullQuantumN()
+vector<int> OperatorBlock::FullQuantumN() const
 {
     vector<int> expanded_qn;
     
     for (int i = 0; i < QuantumN.size(); i++) {
-        for (int j = 0; j < block.at(i).cols(); j++) {
-            expanded_qn.push_back(QuantumN.at(i));
+        for (int j = 0; j < block_size[i]; j++) {
+            expanded_qn.push_back(QuantumN[i]);
         }
     }
     
@@ -353,11 +372,13 @@ void OperatorBlock::PrintInformation()
     PrintVector(QuantumN);
     cout << "Corresponding matrix size: " << endl;
     PrintVector(block_size);
-    //cout << "Operator Blocks: " << endl;
-    //for (int i = 0; i < size(); i++) {
-    //    cout << "Block " << i << ", Quantum number: " << QuantumN[i] << endl;
-    //    cout << block[i] << endl;
-    //}
+    cout << "Operator Blocks: " << endl;
+    for (int i = 0; i < size(); i++) {
+        cout << "Block " << i << ", Quantum number: " << QuantumN[i];
+        cout << ", Size: " << block[i].rows() << "x" << block[i].cols() << endl;
+        //cout << "Block " << i << ", Quantum number: " << QuantumN[i] << endl;
+        // cout << block[i] << endl;
+    }
     cout << "=========================" << endl;
 }
 
@@ -372,13 +393,13 @@ void SuperBlock::UpdateBlock(const MatrixXd &m)
     int flag_qn = QuantumN[0];
     size_t pos = 0;
     for (int i = 1; i < QuantumN.size(); i++) {
-        if (QuantumN.at(i) == flag_qn + 1) {
-            block.push_back(m.block(pos, pos + block_size.at(i - 1), block_size.at(i - 1), block_size.at(i)));
+        if (QuantumN[i] == flag_qn + 1) {
+            block.push_back(m.block(pos, pos + block_size[i - 1], block_size[i - 1], block_size[i]));
         } else {
             block.push_back(MatrixXd::Zero(0, 0));
         }
-        flag_qn = QuantumN.at(i);
-        pos += block_size.at(i - 1);
+        flag_qn = QuantumN[i];
+        pos += block_size[i - 1];
     }
     // The last quantum number does not have coupling
     block.push_back(MatrixXd::Zero(0, 0));
@@ -461,11 +482,11 @@ void WavefunctionBlock::PrintInformation()
     cout << size() << " blocks, with total quantum number: " << endl;
     PrintVector(QuantumN);
     cout << "Norm of this WavefunctionBlock: " << this -> norm() << endl;
-    //cout << "Wavefunction Blocks: " << endl;
-    //for (int i = 0; i < size(); i++) {
-    //    cout << "Block " << i << ", Quantum number: " << QuantumN[i] << endl;
-    //    cout << block[i] << endl;
-    //}
+    cout << "Wavefunction Blocks: " << endl;
+    for (int i = 0; i < size(); i++) {
+        cout << "Block " << i << ", Quantum number: " << QuantumN[i] << endl;
+        cout << block[i] << endl;
+    }
 }
 
 double WavefunctionBlock::norm()

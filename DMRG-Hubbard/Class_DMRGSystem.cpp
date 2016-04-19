@@ -24,6 +24,7 @@ using namespace std;
 DMRGSystem::DMRGSystem(int _nsites, int _max_lanczos_iter, double _rel_err, double u)
 {
     sol = FailSolution::TRUNC;
+    fermion = false;
     
     left_size = 0;
     right_size = 0;
@@ -46,11 +47,11 @@ DMRGSystem::DMRGSystem(int _nsites, int _max_lanczos_iter, double _rel_err, doub
     n_up0 = MatrixXd::Zero(d_per_site, d_per_site);
     n_down0 = MatrixXd::Zero(d_per_site, d_per_site);
 
-    c_up0(0,1) = 1;
-    c_up0(2,3) = 1;
-    c_down0(0,2) = 1;
-    c_down0(1,3) = 1;
-    u0(3,3) = 1;
+    c_up0(0,1) = 1.0;
+    c_up0(2,3) = 1.0;
+    c_down0(0,2) = 1.0;
+    c_down0(1,3) = 1.0;
+    u0(3,3) = 1.0;
     u0 = u * u0;
 
     sz0(1,1) = 0.5;
@@ -92,14 +93,14 @@ void DMRGSystem::WarmUp(int total_QN, int n_states_to_keep, double truncation_er
     for (int n = 1; n < nsites / 2; n++) {
         cout << "=== Warmup: Iteration " << n << " ===" << endl;
         
-        BuildSeed((2 * n + 2) * density);
+        BuildSeed((int)(2 * n + 2) * density);
         
         cout << "Block Size: Left = " << left_size << ", Right = " << right_size << endl;
 
         BuildBlock(BlockPosition::LEFT);
         BuildBlock(BlockPosition::RIGHT);
         
-        GroundState();
+        GroundState(2 * n + 2);
         
         Truncate(BlockPosition::LEFT, n_states_to_keep, truncation_error);
         Truncate(BlockPosition::RIGHT, n_states_to_keep, truncation_error);
@@ -126,7 +127,7 @@ void DMRGSystem::Sweep(int total_QN, int n_sweeps, int n_states_to_keep, double 
         BuildBlock(BlockPosition::LEFT);
         BuildBlock(BlockPosition::RIGHT);
         
-        GroundState();
+        GroundState(nsites);
         
         if (state == SweepDirection::L2R) {
             Truncate(BlockPosition::LEFT, n_states_to_keep, truncation_error);
@@ -188,7 +189,7 @@ void DMRGSystem::BuildSeed(int n)
     if (state == SweepDirection::WR) {
         seed = InitializeWavefunction(quantumN_left, quantumN_right,
                                     block_size_left, block_size_right,
-                                    n, WBType::ONES);
+                                    n, WBType::RANDOM);
     } else {
         if ((left_size == 1 && state == SweepDirection::L2R) ||
             (right_size == 1 && state == SweepDirection::R2L)) {
@@ -355,18 +356,25 @@ void DMRGSystem::BuildBlock(BlockPosition _position)
         
         size_t dim_l = HL.cols();
         
-        //assert(dim_l == c_upL.cols() && "BuildBlock: Dimensions are not properly set in the last iteration! ");
-        
         MatrixXd I_left = MatrixXd::Identity(dim_l, dim_l);
         MatrixXd I_site = MatrixXd::Identity(d_per_site, d_per_site);
+        MatrixXd I_sign;
+        
+        if (fermion == true) {
+            I_sign = H0.IdentitySign();
+        } else {
+            I_sign = I_site;
+        }
         
         MatrixXd H = kroneckerProduct(HL, I_site) + kroneckerProduct(I_left, u0) +
-        kroneckerProduct(c_upL, c_up0.transpose()) + kroneckerProduct(c_upL.transpose(), c_up0) +
-        kroneckerProduct(c_downL, c_down0.transpose()) + kroneckerProduct(c_downL.transpose(), c_down0);
+        kroneckerProduct(I_left, c_up0.transpose()) * kroneckerProduct(c_upL, I_sign) +
+        kroneckerProduct(c_upL.transpose(), I_sign) * kroneckerProduct(I_left, c_up0) +
+        kroneckerProduct(I_left, c_down0.transpose()) * kroneckerProduct(c_downL, I_sign) +
+        kroneckerProduct(c_downL.transpose(), I_sign) * kroneckerProduct(I_left, c_down0);
         
         MatrixReorder(H, BlockL[left_size].idx);
         BlockL[left_size].H.UpdateBlock(H);
-        
+
         c_upL = kroneckerProduct(I_left, c_up0);
         MatrixReorder(c_upL, BlockL[left_size].idx);
         BlockL[left_size].c_up[left_size].UpdateBlock(c_upL);
@@ -386,29 +394,39 @@ void DMRGSystem::BuildBlock(BlockPosition _position)
         
         MatrixXd I_right = MatrixXd::Identity(dim_r, dim_r);
         MatrixXd I_site = MatrixXd::Identity(d_per_site, d_per_site);
-        
+        MatrixXd I_sign;
+
+        if (fermion == true) {
+            I_sign = BlockR[right_size - 1].H.IdentitySign();
+        } else {
+            I_sign = I_right;
+        }
+
         MatrixXd H = kroneckerProduct(I_site, HR) + kroneckerProduct(u0, I_right) +
-        kroneckerProduct(c_up0, c_upR.transpose()) + kroneckerProduct(c_up0.transpose(), c_upR) +
-        kroneckerProduct(c_down0, c_downR.transpose()) + kroneckerProduct(c_down0.transpose(), c_downR);
+        kroneckerProduct(c_up0.transpose(), I_sign) * kroneckerProduct(I_site, c_upR) +
+        kroneckerProduct(I_site, c_upR.transpose()) * kroneckerProduct(c_up0, I_sign) +
+        kroneckerProduct(c_down0.transpose(), I_sign) * kroneckerProduct(I_site, c_downR) +
+        kroneckerProduct(I_site, c_downR.transpose()) * kroneckerProduct(c_down0, I_sign);
         
         MatrixReorder(H, BlockR[right_size].idx);
         BlockR[right_size].H.UpdateBlock(H);
-        
-        c_upR = kroneckerProduct(c_up0, I_right);
+       
+        c_upR = kroneckerProduct(c_up0, I_sign);
         MatrixReorder(c_upR, BlockR[right_size].idx);
         BlockR[right_size].c_up[right_size].UpdateBlock(c_upR);
         
-        c_downR = kroneckerProduct(c_down0, I_right);
+        c_downR = kroneckerProduct(c_down0, I_sign);
         MatrixReorder(c_downR, BlockR[right_size].idx);
         BlockR[right_size].c_down[right_size].UpdateBlock(c_downR);
     }
 }
 
-void DMRGSystem::GroundState()
+void DMRGSystem::GroundState(int site)
 {
-    cout << "Total quantum number sector: " << psi.quantumN_sector << endl;
+    cout << "Total quantum number sector: " << seed.quantumN_sector << endl;
+    cout << "Number of sites: " << site << endl;
     double ev = Lanczos(*this, max_lanczos_iter, rel_err);
-    cout << "Energy per site: " << std::setprecision(12) << ev / psi.quantumN_sector << endl;
+    cout << "Energy per site: " << std::setprecision(12) << ev / site << endl;
 }
 
 double DMRGSystem::Truncate(BlockPosition _position, int _max_m, double _trun_err)
@@ -456,7 +474,7 @@ double DMRGSystem::Truncate(BlockPosition _position, int _max_m, double _trun_er
         
         rho_evec[i] = rsolver.eigenvectors();
     }
-    
+
     eig_idx = SortIndex(rho_eig_t, SortOrder::DESCENDING);
     
     error = 0;
@@ -465,7 +483,7 @@ double DMRGSystem::Truncate(BlockPosition _position, int _max_m, double _trun_er
     double inv_error = 0;
     _max_m = min(_max_m, (int)rho_eig_t.size());
     for (int i = 0; i < _max_m; i++) {
-        inv_error += rho_eig_t.at(i);
+        inv_error += rho_eig_t[i];
         if ((1 - inv_error) < _trun_err) {
             _m = i + 1;
             break;
@@ -519,12 +537,11 @@ double DMRGSystem::Truncate(BlockPosition _position, int _max_m, double _trun_er
         BlockL[left_size].c_up[left_size].RhoPurification(rho);
         BlockL[left_size].c_down[left_size].RhoPurification(rho);
         for (int i = 0; i < n_blocks - 1; i++) {
-            //assert(BlockL[left_size].c_up[left_size].QuantumN[i] == BlockL[left_size].U.QuantumN[i]);
+            assert(BlockL[left_size].c_up[left_size].QuantumN[i] == BlockL[left_size].U.QuantumN[i]);
             BlockL[left_size].c_up[left_size].block_size[i] = rho_evec[i].cols();
             BlockL[left_size].c_down[left_size].block_size[i] = rho_evec[i].cols();
 
             if (BlockL[left_size].U.QuantumN[i] + 1 == BlockL[left_size].U.QuantumN[i + 1]) {
-                
                 tmat = BlockL[left_size].c_up[left_size].block[i] * rho_evec[i + 1];
                 BlockL[left_size].c_up[left_size].block[i] = rho_evec[i].transpose() * tmat;
                 
@@ -544,7 +561,9 @@ double DMRGSystem::Truncate(BlockPosition _position, int _max_m, double _trun_er
         
         BlockL[left_size].c_up[left_size].ZeroPurification();
         BlockL[left_size].c_down[left_size].ZeroPurification();
+
     } else {
+        
         BlockR[right_size].H.RhoPurification(rho);
         
         BlockR[right_size].U.block.clear();
@@ -563,15 +582,13 @@ double DMRGSystem::Truncate(BlockPosition _position, int _max_m, double _trun_er
         BlockR[right_size].c_up[right_size].RhoPurification(rho);
         BlockR[right_size].c_down[right_size].RhoPurification(rho);
         for (int i = 0; i < n_blocks - 1; i++) {
-            //assert(BlockR[right_size].c_up[right_size].QuantumN[i] == BlockR[right_size].U.QuantumN[i]);
             BlockR[right_size].c_up[right_size].block_size[i] = rho_evec[i].cols();
             BlockR[right_size].c_down[right_size].block_size[i] = rho_evec[i].cols();
             
             if (BlockR[right_size].U.QuantumN[i] + 1 == BlockR[right_size].U.QuantumN[i + 1]) {
-                
                 tmat = BlockR[right_size].c_up[right_size].block[i] * rho_evec[i + 1];
                 BlockR[right_size].c_up[right_size].block[i] = rho_evec[i].transpose() * tmat;
-                
+
                 tmat = BlockR[right_size].c_down[right_size].block[i] * rho_evec[i + 1];
                 BlockR[right_size].c_down[right_size].block[i] = rho_evec[i].transpose() * tmat;
             } else {

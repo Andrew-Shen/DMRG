@@ -56,6 +56,7 @@ public:
     
     SweepDirection state;
     FailSolution sol;
+    bool fermion;
     
     DMRGSystem(int _nsites, int _max_lanczos_iter, double _rel_err, double u);
    
@@ -64,7 +65,7 @@ public:
     
     void BuildSeed(int n);
     void BuildBlock(BlockPosition _position);
-    void GroundState();
+    void GroundState(int site);
     double Truncate(BlockPosition _position, int _max_m, double _trun_err);
     //void Measure();
 };

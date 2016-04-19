@@ -28,12 +28,12 @@ int main()
 
     // DMRG Parameters
     nsites = 20;
-    n_sweeps = 3;
+    n_sweeps = 10;
 
     n_states_to_keep = 500;
-    max_lanczos_iter = 100;
-    truncation_error = 1e-8;
-    rel_err = 1e-9;
+    max_lanczos_iter = 500;
+    truncation_error = 1e-7;
+    rel_err = 1e-8;
     
     // Model Paramater
     hubbard_u = 1;
