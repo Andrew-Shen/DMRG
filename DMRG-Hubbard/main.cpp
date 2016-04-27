@@ -32,8 +32,8 @@ int main()
 
     n_states_to_keep = 500;
     max_lanczos_iter = 500;
-    truncation_error = 1e-7;
-    rel_err = 1e-8;
+    truncation_error = 1e-8;
+    rel_err = 1e-10;
     
     // Model Paramater
     hubbard_u = 1;

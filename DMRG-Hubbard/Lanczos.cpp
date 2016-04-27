@@ -247,7 +247,7 @@ WavefunctionBlock SuperBlockProd(DMRGSystem &S, WavefunctionBlock &psi)
             continue;
         }
         
-        if (fermion_sign == true) {
+        if (S.fermion == true) {
             if (S.BlockR[right_size].H.QuantumN[right_idx] % 2) {
                 fermion_sign = -1;
             }
@@ -273,7 +273,7 @@ WavefunctionBlock SuperBlockProd(DMRGSystem &S, WavefunctionBlock &psi)
             continue;
         }
         
-        if (fermion_sign == true) {
+        if (S.fermion == true) {
             if (S.BlockR[right_size].H.QuantumN[right_idx] % 2) {
                 fermion_sign = -1;
             }

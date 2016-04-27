@@ -275,6 +275,23 @@ void OperatorBlock::ZeroPurification()
     }
 }
 
+void OperatorBlock::Truncate(const OperatorBlock &U)
+{
+    MatrixXd tmat;
+    
+    //RhoPurification(U);
+    for (int i = 0; i < U.size(); i++) {
+        assert(QuantumN[i] == U.QuantumN[i]);
+        
+        tmat = block[i] * U.block[i].transpose();
+        block[i] = U.block[i] * tmat;
+        
+        block_size[i] = U.block_size[i];
+    }
+    ZeroPurification();
+}
+
+
 MatrixXd OperatorBlock::IdentitySign()
 {
     MatrixXd tmat;
@@ -404,6 +421,28 @@ void SuperBlock::UpdateBlock(const MatrixXd &m)
     block.push_back(MatrixXd::Zero(0, 0));
 }
 
+void SuperBlock::Truncate(const OperatorBlock &U)
+{
+    MatrixXd tmat;
+    
+    RhoPurification(U);
+    for (int i = 0; i < U.size() - 1; i++) {
+        block_size[i] = U.block_size[i];
+
+        if (U.QuantumN[i] + 1 == U.QuantumN[i + 1]) {
+            tmat = block[i] * U.block[i + 1].transpose();
+            block[i] = U.block[i] * tmat;
+        } else {
+            block[i].resize(0, 0);
+        }
+    }
+    // Speical treatment to the last non-coupling matrix
+    block_size[U.size() - 1] = U.block_size[U.size() - 1];
+    block[U.size() - 1].resize(0, 0);
+
+    ZeroPurification();
+}
+
 MatrixXd SuperBlock::FullOperator()
 {
     size_t total_d = 0;
@@ -443,14 +482,14 @@ void SuperBlock::PrintInformation()
 {
     CheckConsistency();
     cout << "=========================" << endl;
-    cout << this -> size() << " blocks in the SuperBlock. With quantum numbers: " << endl;
+    cout << size() << " blocks in the SuperBlock. With quantum numbers: " << endl;
     PrintVector(QuantumN);
     cout << "Corresponding matrix size: " << endl;
     PrintVector(block_size);
     cout << "Operator Blocks: " << endl;
-    for (int i = 0; i < this -> size(); i++) {
-        cout << "Block " << i << ", Quantum number: " << QuantumN[i] << endl;
-        cout << block[i] << endl;
+    for (int i = 0; i < size(); i++) {
+        cout << "Block " << i << ", Quantum number: " << QuantumN[i] << ", Size: " << block[i].rows() << "x" << block[i].cols() << endl;
+        //cout << block[i] << endl;
     }
 }
 

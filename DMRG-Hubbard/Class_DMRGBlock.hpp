@@ -46,6 +46,7 @@ public:
     }
     
     void RhoPurification(const OperatorBlock &rho);
+    void Truncate(const OperatorBlock &U);
     void ZeroPurification();
     void UpdateQN(const vector<int> &qn);
     void UpdateBlock(const MatrixXd &m);
@@ -82,6 +83,7 @@ class SuperBlock : public OperatorBlock
 {
 public:
     void UpdateBlock(const MatrixXd &m);
+    void Truncate(const OperatorBlock &U);
     
     MatrixXd FullOperator();
 
@@ -135,6 +137,10 @@ public:
     vector<SuperBlock> c_up;
     vector<SuperBlock> c_down;
     
+    vector<OperatorBlock> n_up;
+    vector<OperatorBlock> n_down;
+    
+    
     vector<int> idx;
     
     DMRGBlock()
@@ -151,6 +157,9 @@ public:
     {
         c_up.resize(n);
         c_down.resize(n);
+        
+        n_up.resize(n);
+        n_down.resize(n);
         
         return *this;
     }

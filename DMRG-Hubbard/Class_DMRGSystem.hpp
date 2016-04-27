@@ -28,7 +28,6 @@ public:
     MatrixXd c_down0;
     MatrixXd u0;
     
-    MatrixXd sz0;
     MatrixXd n_up0;
     MatrixXd n_down0;
     
@@ -67,9 +66,12 @@ public:
     void BuildBlock(BlockPosition _position);
     void GroundState(int site);
     double Truncate(BlockPosition _position, int _max_m, double _trun_err);
-    //void Measure();
+    
+    void BuildOperator_n(BlockPosition pos, int site);
+    void Measure();
 };
 
+double measure_n(const OperatorBlock& c, const WavefunctionBlock& psi, BlockPosition pos);
 /*
 double measure_local(const MatrixXd &op, const MatrixXd &psi, BlockPosition pos);
 double measure_two_site(const MatrixXd &op_left, const MatrixXd &op_right, const MatrixXd &psi);
