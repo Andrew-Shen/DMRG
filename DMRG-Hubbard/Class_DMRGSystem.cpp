@@ -152,7 +152,7 @@ void DMRGSystem::Sweep(int total_QN, int n_sweeps, int n_states_to_keep)
         
         if (state == SweepDirection::L2R) {
             if (left_size == right_size && sweep > 0) {
-                Measure();
+                Measure(false);
             }
             
             Truncate(BlockPosition::LEFT, n_states_to_keep, trunc_err);
@@ -570,7 +570,7 @@ double DMRGSystem::Truncate(BlockPosition _position, int _max_m, double _trunc_e
     return error;
 }
 
-void DMRGSystem::Measure()
+void DMRGSystem::Measure(bool print_res)
 {
     ofstream inFile;
 
@@ -617,13 +617,18 @@ void DMRGSystem::Measure()
     for (int i = 0; i <= left_size; i++) {
         double n_up = MeasureLocalDiag(n_upL[i], psi, BlockPosition::LEFT);
         double n_down = MeasureLocalDiag(n_downL[i], psi, BlockPosition::LEFT);
-        cout << "n(" << i << ") = " << n_up + n_down << ", " << "Sz(" << i << ") = " << (n_up - n_down) * 0.5 << endl;
+        if (print_res == true) {
+            cout << "n(" << i << ") = " << n_up + n_down << ", " << "Sz(" << i << ") = " << (n_up - n_down) * 0.5 << endl;
+        }
+        
         inFile << i << "\t" << n_up + n_down << "\t" << (n_up - n_down) * 0.5 << endl;
     }
     for (int i = right_size; i >= 0; i--) {
         double n_up = MeasureLocalDiag(n_upR[i], psi, BlockPosition::RIGHT);
         double n_down = MeasureLocalDiag(n_downR[i], psi, BlockPosition::RIGHT);
-        cout << "n(" << nsites - i - 1 << ") = " << n_up + n_down << ", " << "Sz(" << nsites - i - 1 << ") = " << (n_up - n_down) * 0.5 << endl;
+        if (print_res == true) {
+            cout << "n(" << nsites - i - 1 << ") = " << n_up + n_down << ", " << "Sz(" << nsites - i - 1 << ") = " << (n_up - n_down) * 0.5 << endl;
+        }
         inFile << nsites - i - 1 << "\t" << n_up + n_down << "\t" << (n_up - n_down) * 0.5 << endl;
     }
     inFile << endl;
@@ -636,7 +641,9 @@ void DMRGSystem::Measure()
             double sz = MeasureTwoDiag(n_upL[i], n_upR[j], psi) + MeasureTwoDiag(n_downL[i], n_downR[j], psi) -
             MeasureTwoDiag(n_upL[i], n_downR[j], psi) - MeasureTwoDiag(n_downL[i], n_upR[j], psi);
             sz *= 0.25;
-            cout << "Sz(" << i << "," << nsites - j - 1 << ") = " << sz << endl;
+            if (print_res == true) {
+                cout << "Sz(" << i << "," << nsites - j - 1 << ") = " << sz << endl;
+            }
             inFile << i << "\t" << nsites - j - 1 << "\t" << sz << endl;
         }
     }
@@ -646,7 +653,9 @@ void DMRGSystem::Measure()
         for (int j = i + 1; j <= left_size; j++) {
             OperatorBlock opt = BuildDiagOperator(sz0, i, j, BlockPosition::LEFT);
             double sz = MeasureLocalDiag(opt, psi, BlockPosition::LEFT);
-            cout << "Sz(" << i << "," <<  j << ") = " << sz << endl;
+            if (print_res == true) {
+                cout << "Sz(" << i << "," <<  j << ") = " << sz << endl;
+            }
             inFile << i << "\t" << j << "\t" << sz << endl;
         }
     }
@@ -654,7 +663,9 @@ void DMRGSystem::Measure()
         for (int j = right_size; j > i; j--) {
             OperatorBlock opt = BuildDiagOperator(sz0, i, j, BlockPosition::RIGHT);
             double sz = MeasureLocalDiag(opt, psi, BlockPosition::RIGHT);
-            cout << "Sz(" << nsites - i - 1 << "," <<  nsites - j - 1 << ") = " << sz << endl;
+            if (print_res == true) {
+                cout << "Sz(" << nsites - i - 1 << "," <<  nsites - j - 1 << ") = " << sz << endl;
+            }
             inFile << nsites - i - 1 << "\t" << nsites - j - 1 << "\t" << sz << endl;
         }
     }

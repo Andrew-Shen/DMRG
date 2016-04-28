@@ -71,7 +71,7 @@ public:
     void GroundState(int site);
     double Truncate(BlockPosition _position, int _max_m, double _trunc_err);
     
-    void Measure();
+    void Measure(bool print_res);
     OperatorBlock BuildDiagOperator(const MatrixXd& op0, int site1, int site2, BlockPosition pos);
     //void BuildOperator_n(BlockPosition pos, int site);
     //void BuildOperator_c(BlockPosition pos, int site);
