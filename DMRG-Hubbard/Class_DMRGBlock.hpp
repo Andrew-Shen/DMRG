@@ -101,7 +101,7 @@ public:
     WavefunctionBlock();
     WavefunctionBlock(int _size);
     
-    int SearchQuantumN(int n);
+    int SearchQuantumN(int n) const;
     
     WavefunctionBlock& resize(int n);
     
@@ -137,8 +137,8 @@ public:
     vector<SuperBlock> c_up;
     vector<SuperBlock> c_down;
     
-    vector<OperatorBlock> n_up;
-    vector<OperatorBlock> n_down;
+    //vector<OperatorBlock> n_up;
+    //vector<OperatorBlock> n_down;
     
     
     vector<int> idx;
@@ -158,8 +158,8 @@ public:
         c_up.resize(n);
         c_down.resize(n);
         
-        n_up.resize(n);
-        n_down.resize(n);
+        //n_up.resize(n);
+        //n_down.resize(n);
         
         return *this;
     }

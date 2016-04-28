@@ -13,6 +13,8 @@
 #include <iostream>
 #include <vector>
 #include <Eigen/Core>
+#include <chrono>
+#include <ctime>
 #include "Class_DMRGBlock.hpp"
 
 using namespace Eigen;
@@ -40,11 +42,12 @@ public:
     WavefunctionBlock seed;
     OperatorBlock rho;
 
-    double u;   // Hubbard U
+    double hubbard_u;   // Hubbard U
     
     double energy;
     double error;
     
+    double trunc_err;
     double rel_err;
     int max_lanczos_iter;
     
@@ -57,23 +60,27 @@ public:
     FailSolution sol;
     bool fermion;
     
-    DMRGSystem(int _nsites, int _max_lanczos_iter, double _rel_err, double u);
+    chrono::time_point<chrono::system_clock> StartTime;
+    DMRGSystem(int _nsites, int _max_lanczos_iter, double _trunc_err, double _rel_err, double u);
    
     void WarmUp(int total_QN, int n_states_to_keep, double truncation_error);
-    void Sweep(int total_QN, int n_sweeps, int n_states_to_keep, double truncation_error);
+    void Sweep(int total_QN, int n_sweeps, int n_states_to_keep);
     
     void BuildSeed(int n);
     void BuildBlock(BlockPosition _position);
     void GroundState(int site);
-    double Truncate(BlockPosition _position, int _max_m, double _trun_err);
+    double Truncate(BlockPosition _position, int _max_m, double _trunc_err);
     
-    void BuildOperator_n(BlockPosition pos, int site);
-    void BuildOperator_c(BlockPosition pos, int site);
     void Measure();
+    OperatorBlock BuildDiagOperator(const MatrixXd& op0, int site1, int site2, BlockPosition pos);
+    //void BuildOperator_n(BlockPosition pos, int site);
+    //void BuildOperator_c(BlockPosition pos, int site);
+    //SuperBlock BuildLocalOperator_splus(BlockPosition pos, int site);
+    //OperatorBlock BuildNonlocalOperator_sz(BlockPosition pos, int site1, int site2);
 };
 
 double MeasureLocalDiag(const OperatorBlock& n, const WavefunctionBlock& psi, BlockPosition pos);
 double MeasureTwoDiag(const OperatorBlock& op_left, const OperatorBlock& op_right, const WavefunctionBlock& psi);
-
+double MeasureTwoSuperDiag(const OperatorBlock& op_left, const OperatorBlock& op_right, const WavefunctionBlock& psi);
 
 #endif /* Class_DMRGSystem_hpp */

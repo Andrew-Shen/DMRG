@@ -550,7 +550,7 @@ WavefunctionBlock &WavefunctionBlock::normalize()
     return *this;
 }
 
-int WavefunctionBlock::SearchQuantumN(int n)
+int WavefunctionBlock::SearchQuantumN(int n) const
 {
     return SearchIndex(QuantumN, n);
 }

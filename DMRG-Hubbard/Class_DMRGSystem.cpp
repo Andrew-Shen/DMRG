@@ -11,17 +11,20 @@
 #include "Lanczos.hpp"
 
 #include <iostream>
+#include <fstream>
 #include <iomanip>
 #include <vector>
 #include <math.h>
 #include <Eigen/Dense>
 #include <unsupported/Eigen/KroneckerProduct>
 #include <algorithm>
+#include <chrono>
+#include <ctime>
 
 using namespace Eigen;
 using namespace std;
 
-DMRGSystem::DMRGSystem(int _nsites, int _max_lanczos_iter, double _rel_err, double u)
+DMRGSystem::DMRGSystem(int _nsites, int _max_lanczos_iter, double _trunc_err, double _rel_err, double u)
 {
     sol = FailSolution::TRUNC;
     
@@ -40,6 +43,7 @@ DMRGSystem::DMRGSystem(int _nsites, int _max_lanczos_iter, double _rel_err, doub
 
     max_lanczos_iter = _max_lanczos_iter;
     rel_err = _rel_err;
+    trunc_err = _trunc_err;
 
     d_per_site = 4; // Dimension of Hilbert space per site.
     
@@ -50,22 +54,23 @@ DMRGSystem::DMRGSystem(int _nsites, int _max_lanczos_iter, double _rel_err, doub
     n_up0 = MatrixXd::Zero(d_per_site, d_per_site);
     n_down0 = MatrixXd::Zero(d_per_site, d_per_site);
 
-    c_up0(0,1) = 1.0;
-    c_up0(2,3) = 1.0;
-    c_down0(0,2) = 1.0;
+    c_up0(0, 1) = 1.0;
+    c_up0(2, 3) = 1.0;
+    c_down0(0, 2) = 1.0;
     if (fermion == true) {
         // this comes from the definition of fermion order above
-        c_down0(1,3) = -1.0;
+        c_down0(1, 3) = -1.0;
     } else {
-        c_down0(1,3) = 1.0;
+        c_down0(1, 3) = 1.0;
     }
-    u0(3,3) = 1.0;
+    u0(3, 3) = 1.0;
     u0 = u * u0;
+    hubbard_u = u;
 
-    n_up0(1,1) = 1.0;
-    n_up0(3,3) = 1.0;
-    n_down0(2,2) = 1.0;
-    n_down0(3,3) = 1.0;
+    n_up0(1, 1) = 1.0;
+    n_up0(3, 3) = 1.0;
+    n_down0(2, 2) = 1.0;
+    n_down0(3, 3) = 1.0;
     
     vector<int> tsize = {0, 1, 1, 2};
     H0.UpdateQN(tsize);
@@ -80,7 +85,11 @@ DMRGSystem::DMRGSystem(int _nsites, int _max_lanczos_iter, double _rel_err, doub
     BlockR[0].c_down[0] = BlockL[0].c_down[0];
     
 
-    cout << "DMRG System initialized " << endl;
+    StartTime = chrono::system_clock::now();
+    time_t start_t = chrono::system_clock::to_time_t(StartTime);
+    char mbstr[100];
+    strftime(mbstr, sizeof(mbstr), "%c", localtime(&start_t));
+    cout << "DMRG System initialized at " << mbstr << endl;
     cout << "Wavefunction transformation fail solution: ";
     if (sol == FailSolution::TRUNC) {
         cout << "Omit basis" << endl;
@@ -119,7 +128,7 @@ void DMRGSystem::WarmUp(int total_QN, int n_states_to_keep, double truncation_er
     }
 }
 
-void DMRGSystem::Sweep(int total_QN, int n_sweeps, int n_states_to_keep, double truncation_error)
+void DMRGSystem::Sweep(int total_QN, int n_sweeps, int n_states_to_keep)
 {
     int first_iter = 0.5 * nsites;
     left_size = first_iter - 1;
@@ -146,7 +155,7 @@ void DMRGSystem::Sweep(int total_QN, int n_sweeps, int n_states_to_keep, double 
                 Measure();
             }
             
-            Truncate(BlockPosition::LEFT, n_states_to_keep, truncation_error);
+            Truncate(BlockPosition::LEFT, n_states_to_keep, trunc_err);
             // if there is wavefuncation transformation, the sweep must not return until the end
             if (left_size == nsites - 3) {
                 state = SweepDirection::R2L;
@@ -156,7 +165,7 @@ void DMRGSystem::Sweep(int total_QN, int n_sweeps, int n_states_to_keep, double 
                 right_size --;
             }
         } else {
-            Truncate(BlockPosition::RIGHT, n_states_to_keep, truncation_error);            
+            Truncate(BlockPosition::RIGHT, n_states_to_keep, trunc_err);
             
             if (right_size == nsites - 3) {
                 state = SweepDirection::L2R;
@@ -435,7 +444,7 @@ void DMRGSystem::GroundState(int site)
     cout << "Energy per site: " << std::setprecision(12) << ev / site << endl;
 }
 
-double DMRGSystem::Truncate(BlockPosition _position, int _max_m, double _trun_err)
+double DMRGSystem::Truncate(BlockPosition _position, int _max_m, double _trunc_err)
 {
     int n = psi.quantumN_sector;
     size_t n_blocks = psi.QuantumN.size();
@@ -490,7 +499,7 @@ double DMRGSystem::Truncate(BlockPosition _position, int _max_m, double _trun_er
     _max_m = min(_max_m, (int)rho_eig_t.size());
     for (int i = 0; i < _max_m; i++) {
         inv_error += rho_eig_t[i];
-        if ((1 - inv_error) < _trun_err) {
+        if ((1 - inv_error) < _trunc_err) {
             _m = i + 1;
             break;
         }
@@ -563,155 +572,112 @@ double DMRGSystem::Truncate(BlockPosition _position, int _max_m, double _trun_er
 
 void DMRGSystem::Measure()
 {
+    ofstream inFile;
+
+    time_t start_t = chrono::system_clock::to_time_t(StartTime);
+    char mbstr[100];
+    strftime(mbstr, sizeof(mbstr), "%F %H%M%S.txt", localtime(&start_t));
+    inFile.open(mbstr, ios::trunc);
+    
+    inFile << "Model Parameters: " << endl;
+    if (fermion == true) {
+        inFile << "Fermion, ";
+    } else {
+        inFile << "Boson, ";
+    }
+
+    inFile << "t = 1.0, U = " << hubbard_u << endl;
+    inFile << "Site = " << nsites << ", Particles = " << psi.quantumN_sector << endl;
+    inFile << "DMRG Parameters: " << endl;
+    inFile << "Truncation Err = " << trunc_err << ", Lancozs Err = " << rel_err << ", ";
+    if (sol == FailSolution::TRUNC) {
+        inFile << "Omit basis" << endl;
+    } else {
+        inFile << "Random seed" << endl;
+    }
+    inFile << endl;
+    
     cout << "=== Measurement: Building Operators ===" << endl;
+    vector<OperatorBlock> n_upL(left_size + 1);
+    vector<OperatorBlock> n_downL(left_size + 1);
+    vector<OperatorBlock> n_upR(right_size + 1);
+    vector<OperatorBlock> n_downR(right_size + 1);
+
     for (int i = 0; i <= left_size; i++) {
-        BuildOperator_n(BlockPosition::LEFT, i);
-        BuildOperator_c(BlockPosition::LEFT, i);
+        n_upL[i] = BuildDiagOperator(n_up0, i, 0, BlockPosition::LEFT);
+        n_downL[i] = BuildDiagOperator(n_down0, i, 0, BlockPosition::LEFT);
     }
     for (int i = 0; i <= right_size; i++) {
-        BuildOperator_n(BlockPosition::RIGHT, i);
-        BuildOperator_c(BlockPosition::RIGHT, i);
+        n_upR[i] = BuildDiagOperator(n_up0, i, 0, BlockPosition::RIGHT);
+        n_downR[i] = BuildDiagOperator(n_down0, i, 0, BlockPosition::RIGHT);
     }
     
     cout << "=== Measurement: Local ===" << endl;
+    inFile << "Local Measurement: site_i, <n(i)>, <Sz(i)>" << endl;
     for (int i = 0; i <= left_size; i++) {
-        double n_up = MeasureLocalDiag(BlockL[left_size].n_up[i], psi, BlockPosition::LEFT);
-        double n_down = MeasureLocalDiag(BlockL[left_size].n_down[i], psi, BlockPosition::LEFT);
+        double n_up = MeasureLocalDiag(n_upL[i], psi, BlockPosition::LEFT);
+        double n_down = MeasureLocalDiag(n_downL[i], psi, BlockPosition::LEFT);
         cout << "n(" << i << ") = " << n_up + n_down << ", " << "Sz(" << i << ") = " << (n_up - n_down) * 0.5 << endl;
+        inFile << i << "\t" << n_up + n_down << "\t" << (n_up - n_down) * 0.5 << endl;
     }
     for (int i = right_size; i >= 0; i--) {
-        double n_up = MeasureLocalDiag(BlockR[right_size].n_up[i], psi, BlockPosition::RIGHT);
-        double n_down = MeasureLocalDiag(BlockR[right_size].n_down[i], psi, BlockPosition::RIGHT);
+        double n_up = MeasureLocalDiag(n_upR[i], psi, BlockPosition::RIGHT);
+        double n_down = MeasureLocalDiag(n_downR[i], psi, BlockPosition::RIGHT);
         cout << "n(" << nsites - i - 1 << ") = " << n_up + n_down << ", " << "Sz(" << nsites - i - 1 << ") = " << (n_up - n_down) * 0.5 << endl;
+        inFile << nsites - i - 1 << "\t" << n_up + n_down << "\t" << (n_up - n_down) * 0.5 << endl;
     }
+    inFile << endl;
     
     cout << "=== Measurement: Sz Correlation ===" << endl;
+    inFile << "Correlation Measurement: site_i, site_j, <Sz(i)Sz(j)>" << endl;
+    cout << "----- Inter-block Measurement -----" << endl;
     for (int i = 0; i <= left_size; i++) {
         for (int j = right_size; j >= 0; j--) {
-            double sz = MeasureTwoDiag(BlockL[left_size].n_up[i], BlockR[right_size].n_up[j], psi) +
-            MeasureTwoDiag(BlockL[left_size].n_down[i], BlockR[right_size].n_down[j], psi) -
-            MeasureTwoDiag(BlockL[left_size].n_up[i], BlockR[right_size].n_down[j], psi) -
-            MeasureTwoDiag(BlockL[left_size].n_down[i], BlockR[right_size].n_up[j], psi);
+            double sz = MeasureTwoDiag(n_upL[i], n_upR[j], psi) + MeasureTwoDiag(n_downL[i], n_downR[j], psi) -
+            MeasureTwoDiag(n_upL[i], n_downR[j], psi) - MeasureTwoDiag(n_downL[i], n_upR[j], psi);
             sz *= 0.25;
             cout << "Sz(" << i << "," << nsites - j - 1 << ") = " << sz << endl;
+            inFile << i << "\t" << nsites - j - 1 << "\t" << sz << endl;
         }
     }
-    
-}
-
-void DMRGSystem::BuildOperator_n(BlockPosition pos, int site)
-{
-    MatrixXd tmat1, tmat2;
-    
-    MatrixXd I_site = MatrixXd::Identity(d_per_site, d_per_site);
-    if (pos == BlockPosition::LEFT) {
-        for (int i = site; i <= left_size; i++) {
-            if (i == 0) {
-                vector<int> tvec = {0, 1, 1, 2};
-                BlockL[0].n_up[0].UpdateQN(tvec);
-                BlockL[0].n_up[0].UpdateBlock(n_up0);
-                
-                BlockL[0].n_down[0].UpdateQN(tvec);
-                BlockL[0].n_down[0].UpdateBlock(n_down0);
-                continue;
-            }
-            
-            vector<int> quantumN_left = KronQuantumN(BlockL[i - 1].H, H0);
-            vector<int> trans_idx_left = SortIndex(quantumN_left, SortOrder::ASCENDING);
-            
-            if (i == site) {
-                size_t dim_l = BlockL[i - 1].H.total_d();
-                MatrixXd I_left = MatrixXd::Identity(dim_l, dim_l);
-                tmat1 = kroneckerProduct(I_left, n_up0);
-                tmat2 = kroneckerProduct(I_left, n_down0);
-            } else {
-                tmat1 = kroneckerProduct(BlockL[i - 1].n_up[site].FullOperator(), I_site);
-                tmat2 = kroneckerProduct(BlockL[i - 1].n_down[site].FullOperator(), I_site);
-            }
-            MatrixReorder(tmat1, BlockL[i].idx);
-            MatrixReorder(tmat2, BlockL[i].idx);
-            BlockL[i].n_up[site].UpdateQN(quantumN_left);
-            BlockL[i].n_up[site].UpdateBlock(tmat1);
-            BlockL[i].n_down[site].UpdateQN(quantumN_left);
-            BlockL[i].n_down[site].UpdateBlock(tmat2);
-    
-            if (i != left_size) {
-                BlockL[i].n_up[site].RhoPurification(BlockL[i].U);
-                BlockL[i].n_down[site].RhoPurification(BlockL[i].U);
-                BlockL[i].n_up[site].Truncate(BlockL[i].U);
-                BlockL[i].n_down[site].Truncate(BlockL[i].U);
-            }
-        }
-    } else {
-        for (int i = site; i <= right_size; i++) {
-            if (i == 0) {
-                vector<int> tvec = {0, 1, 1, 2};
-                BlockR[0].n_up[0].UpdateQN(tvec);
-                BlockR[0].n_up[0].UpdateBlock(n_up0);
-                
-                BlockR[0].n_down[0].UpdateQN(tvec);
-                BlockR[0].n_down[0].UpdateBlock(n_down0);
-                continue;
-            }
-            
-            vector<int> quantumN_right = KronQuantumN(H0, BlockR[i - 1].H);
-            vector<int> trans_idx_right = SortIndex(quantumN_right, SortOrder::ASCENDING);
-            
-            if (i == site) {
-                size_t dim_r = BlockR[i - 1].H.total_d();
-                MatrixXd I_right = MatrixXd::Identity(dim_r, dim_r);
-                tmat1 = kroneckerProduct(n_up0, I_right);
-                tmat2 = kroneckerProduct(n_down0, I_right);
-            } else {
-                tmat1 = kroneckerProduct(I_site, BlockR[i - 1].n_up[site].FullOperator());
-                tmat2 = kroneckerProduct(I_site, BlockR[i - 1].n_down[site].FullOperator());
-            }
-            MatrixReorder(tmat1, BlockR[i].idx);
-            MatrixReorder(tmat2, BlockR[i].idx);
-            BlockR[i].n_up[site].UpdateQN(quantumN_right);
-            BlockR[i].n_up[site].UpdateBlock(tmat1);
-            BlockR[i].n_down[site].UpdateQN(quantumN_right);
-            BlockR[i].n_down[site].UpdateBlock(tmat2);
-            
-            if (i != right_size) {
-                BlockR[i].n_up[site].RhoPurification(BlockR[i].U);
-                BlockR[i].n_up[site].Truncate(BlockR[i].U);
-                BlockR[i].n_down[site].RhoPurification(BlockR[i].U);
-                BlockR[i].n_down[site].Truncate(BlockR[i].U);
-            }
+    cout << "----- Intra-block Measurement -----" << endl;
+    MatrixXd sz0 = 0.5 * (n_up0 - n_down0);
+    for (int i = 0; i < left_size; i++) {
+        for (int j = i + 1; j <= left_size; j++) {
+            OperatorBlock opt = BuildDiagOperator(sz0, i, j, BlockPosition::LEFT);
+            double sz = MeasureLocalDiag(opt, psi, BlockPosition::LEFT);
+            cout << "Sz(" << i << "," <<  j << ") = " << sz << endl;
+            inFile << i << "\t" << j << "\t" << sz << endl;
         }
     }
-}
-
-double MeasureLocalDiag(const OperatorBlock& op, const WavefunctionBlock& psi, BlockPosition pos)
-{
-    double res = 0;
-    MatrixXd tmat;
-    if (pos == BlockPosition::LEFT) {
-        for (int i = 0; i < psi.size(); i++) {
-            int qn = psi.QuantumN[i];
-            int idx = op.SearchQuantumN(qn);
-            if (idx == -1) {
-                continue;
-            }
-            tmat = op.block[idx] * psi.block[i];
-            res += (psi.block[i].transpose() * tmat).trace();
-        }
-    } else {
-        for (int i = 0; i < psi.size(); i++) {
-            int qn = psi.QuantumN[i];
-            int idx = op.SearchQuantumN(psi.quantumN_sector - qn);
-            if (idx == -1) {
-                continue;
-            }
-            tmat = op.block[idx] * psi.block[i].transpose();
-            res += (psi.block[i] * tmat).trace();
+    for (int i = right_size; i >= 0; i--) {
+        for (int j = right_size; j > i; j--) {
+            OperatorBlock opt = BuildDiagOperator(sz0, i, j, BlockPosition::RIGHT);
+            double sz = MeasureLocalDiag(opt, psi, BlockPosition::RIGHT);
+            cout << "Sz(" << nsites - i - 1 << "," <<  nsites - j - 1 << ") = " << sz << endl;
+            inFile << nsites - i - 1 << "\t" << nsites - j - 1 << "\t" << sz << endl;
         }
     }
+    inFile << endl;
+     
+    /*
+    cout << "=== Measurement: S+S- Correlation ===" << endl;
+    cout << "----- Inter-block Measurement -----" << endl;
+    for (int i = 0; i <= left_size; i++) {
+        SuperBlock splus_l = BuildLocalOperator_splus(BlockPosition::LEFT, i);
+        for (int j = right_size; j >= 0; j--) {
+     
+            cout << "S+(" << i << ")S-(" << nsites - j - 1 << ") = " << sz << endl;
+        }
+    }
+     */
     
-    return res;
+    inFile.close();
 }
 
+
+
+/*
 void DMRGSystem::BuildOperator_c(BlockPosition pos, int site)
 {
     MatrixXd tmat;
@@ -765,6 +731,119 @@ void DMRGSystem::BuildOperator_c(BlockPosition pos, int site)
         }
     }
 }
+*/
+
+OperatorBlock DMRGSystem::BuildDiagOperator(const MatrixXd& op0, int site1, int site2, BlockPosition pos)
+{
+    assert(site1 < site2 || site2 == 0);
+    MatrixXd tmat;
+    vector<OperatorBlock> opt;
+    
+    MatrixXd I_site = MatrixXd::Identity(d_per_site, d_per_site);
+    if (pos == BlockPosition::LEFT) {
+        opt.resize(left_size + 1);
+        for (int i = site1; i <= left_size; i++) {
+            if (i == 0) {
+                vector<int> tvec = {0, 1, 1, 2};
+                opt[0].UpdateQN(tvec);
+                opt[0].UpdateBlock(op0);
+                continue;
+            }
+            
+            vector<int> quantumN_left = KronQuantumN(BlockL[i - 1].H, H0);
+            vector<int> trans_idx_left = SortIndex(quantumN_left, SortOrder::ASCENDING);
+            
+            if (i == site1) {
+                size_t dim_l = BlockL[i - 1].H.total_d();
+                MatrixXd I_left = MatrixXd::Identity(dim_l, dim_l);
+                tmat = kroneckerProduct(I_left, op0);
+            } else {
+                if (i == site2 && site2 != 0) {
+                    tmat = kroneckerProduct(opt[i - 1].FullOperator(), op0);
+                } else {
+                    tmat = kroneckerProduct(opt[i - 1].FullOperator(), I_site);
+                }
+                
+            }
+            MatrixReorder(tmat, BlockL[i].idx);
+            opt[i].UpdateQN(quantumN_left);
+            opt[i].UpdateBlock(tmat);
+            
+            if (i != left_size) {
+                opt[i].RhoPurification(BlockL[i].U);
+                opt[i].Truncate(BlockL[i].U);
+            }
+        }
+        return opt[left_size];
+    } else {
+        opt.resize(right_size + 1);
+        for (int i = site1; i <= right_size; i++) {
+            if (i == 0) {
+                vector<int> tvec = {0, 1, 1, 2};
+                opt[0].UpdateQN(tvec);
+                opt[0].UpdateBlock(op0);
+                continue;
+            }
+            
+            vector<int> quantumN_right = KronQuantumN(H0, BlockR[i - 1].H);
+            vector<int> trans_idx_right = SortIndex(quantumN_right, SortOrder::ASCENDING);
+            
+            if (i == site1) {
+                size_t dim_r = BlockR[i - 1].H.total_d();
+                MatrixXd I_right = MatrixXd::Identity(dim_r, dim_r);
+                tmat = kroneckerProduct(op0, I_right);
+            } else {
+                if (i == site2 && site2 != 0) {
+                    tmat = kroneckerProduct(op0, opt[i - 1].FullOperator());
+                } else {
+                    tmat = kroneckerProduct(I_site, opt[i - 1].FullOperator());
+                }
+                
+            }
+            MatrixReorder(tmat, BlockR[i].idx);
+            opt[i].UpdateQN(quantumN_right);
+            opt[i].UpdateBlock(tmat);
+            
+            if (i != right_size) {
+                opt[i].RhoPurification(BlockR[i].U);
+                opt[i].Truncate(BlockR[i].U);
+            }
+        }
+        return opt[right_size];
+    }
+    
+    assert("Something must be wrong! ");
+    return opt[0];
+}
+
+double MeasureLocalDiag(const OperatorBlock& op, const WavefunctionBlock& psi, BlockPosition pos)
+{
+    double res = 0;
+    MatrixXd tmat;
+    if (pos == BlockPosition::LEFT) {
+        for (int i = 0; i < psi.size(); i++) {
+            int qn = psi.QuantumN[i];
+            int idx = op.SearchQuantumN(qn);
+            if (idx == -1) {
+                continue;
+            }
+            tmat = op.block[idx] * psi.block[i];
+            res += (psi.block[i].transpose() * tmat).trace();
+        }
+    } else {
+        for (int i = 0; i < psi.size(); i++) {
+            int qn = psi.QuantumN[i];
+            int idx = op.SearchQuantumN(psi.quantumN_sector - qn);
+            if (idx == -1) {
+                continue;
+            }
+            tmat = op.block[idx] * psi.block[i].transpose();
+            res += (psi.block[i] * tmat).trace();
+        }
+    }
+    
+    return res;
+}
 
 double MeasureTwoDiag(const OperatorBlock& op_left, const OperatorBlock& op_right, const WavefunctionBlock& psi)
 {
@@ -785,3 +864,26 @@ double MeasureTwoDiag(const OperatorBlock& op_left, const OperatorBlock& op_righ
     
     return res;
 }
+
+double MeasureTwoSuperDiag(const OperatorBlock& op_left, const OperatorBlock& op_right, const WavefunctionBlock& psi)
+{
+    double res = 0;
+    MatrixXd tmat, tmat2;
+    
+    for (int i = 0; i < psi.size(); i++) {
+        int qn = psi.QuantumN[i];
+        int idx_l = op_left.SearchQuantumN(qn);
+        int idx_r = op_right.SearchQuantumN(psi.quantumN_sector - qn - 1);
+        int idx_b = psi.SearchQuantumN(qn + 1);
+        if (idx_l == -1 || idx_r == -1 || idx_b == -1) {
+            continue;
+        }
+        tmat = op_left.block[idx_l].transpose() * psi.block[i];
+        tmat2 = psi.block[idx_b].transpose() * tmat;
+        res += (tmat2 * op_right.block[idx_r]).trace();
+    }
+    
+    return res;
+}
+
+
