@@ -68,13 +68,12 @@ public:
     double Truncate(BlockPosition _position, int _max_m, double _trun_err);
     
     void BuildOperator_n(BlockPosition pos, int site);
+    void BuildOperator_c(BlockPosition pos, int site);
     void Measure();
 };
 
-double measure_n(const OperatorBlock& c, const WavefunctionBlock& psi, BlockPosition pos);
-/*
-double measure_local(const MatrixXd &op, const MatrixXd &psi, BlockPosition pos);
-double measure_two_site(const MatrixXd &op_left, const MatrixXd &op_right, const MatrixXd &psi);
+double MeasureLocalDiag(const OperatorBlock& n, const WavefunctionBlock& psi, BlockPosition pos);
+double MeasureTwoDiag(const OperatorBlock& op_left, const OperatorBlock& op_right, const WavefunctionBlock& psi);
 
-*/
+
 #endif /* Class_DMRGSystem_hpp */
