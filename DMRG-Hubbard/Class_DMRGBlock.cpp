@@ -13,6 +13,7 @@
 #include <vector>
 #include <Eigen/Dense>
 #include <math.h>
+#include <complex>
 
 using namespace Eigen;
 using namespace std;
@@ -29,7 +30,7 @@ template void PrintVector(const vector<int> &vec);
 template void PrintVector(const vector<double> &vec);
 template void PrintVector(const vector<size_t> &vec);
 
-MatrixXd MatrixDirectPlus(const MatrixXd &m1, const MatrixXd &m2)
+MatrixXcd MatrixDirectPlus(const MatrixXcd &m1, const MatrixXcd &m2)
 {
     size_t row_m1 = m1.rows();
     size_t row_m2 = m2.rows();
@@ -43,7 +44,7 @@ MatrixXd MatrixDirectPlus(const MatrixXd &m1, const MatrixXd &m2)
         assert(row_m2 == col_m2 && "Matrix direct plus: A (n x 0) or (0 x n) matrix encountered! ");
     }
     
-    MatrixXd nmat = MatrixXd::Zero(row_m1 + row_m2, col_m1 + col_m2);
+    MatrixXcd nmat = MatrixXcd::Zero(row_m1 + row_m2, col_m1 + col_m2);
     
     nmat.block(0, 0, row_m1, col_m1) = m1;
     nmat.block(row_m1, col_m1, row_m2, col_m2) = m2;
@@ -51,7 +52,7 @@ MatrixXd MatrixDirectPlus(const MatrixXd &m1, const MatrixXd &m2)
     return nmat;
 }
 
-void MatrixReorder(MatrixXd &m, vector<int> &vec_idx)
+void MatrixReorder(MatrixXcd &m, vector<int> &vec_idx)
 {
     size_t dm = m.cols();
     size_t dv = vec_idx.size();
@@ -59,7 +60,7 @@ void MatrixReorder(MatrixXd &m, vector<int> &vec_idx)
     assert(dm == m.rows() && "Matrix reorder: The matrix is not square! ");
     assert(dm == dv && "Matrix reorder: The size of the matrix and the index vector do not match! ");
     
-    MatrixXd tmat(dm, dm);
+    MatrixXcd tmat(dm, dm);
     
     for (int i = 0; i < dm; i++) {
         for (int j = 0; j < dm; j++) {
@@ -229,7 +230,7 @@ int OperatorBlock::BlockLastIdx(int idx)
 
 void OperatorBlock::RhoPurification(const OperatorBlock &rho)
 {
-    vector<MatrixXd>::iterator it_block = block.begin();
+    vector<MatrixXcd>::iterator it_block = block.begin();
     vector<size_t>::iterator it_bs = block_size.begin();
     
     for(vector<int>::iterator it_qn = QuantumN.begin(); it_qn != QuantumN.end(); )
@@ -258,7 +259,7 @@ void OperatorBlock::ZeroPurification()
     vector<int>::iterator it_qn = QuantumN.begin();
     vector<size_t>::iterator it_bs = block_size.begin();
     
-    for(vector<MatrixXd>::iterator it_block = block.begin(); it_block != block.end(); )
+    for(vector<MatrixXcd>::iterator it_block = block.begin(); it_block != block.end(); )
     {
         if(*it_bs == 0) // the last "fictitious" block in the SuperBlock will not be removed in this way
         {
@@ -277,13 +278,13 @@ void OperatorBlock::ZeroPurification()
 
 void OperatorBlock::Truncate(const OperatorBlock &U)
 {
-    MatrixXd tmat;
+    MatrixXcd tmat;
     
     //RhoPurification(U);
     for (int i = 0; i < U.size(); i++) {
         assert(QuantumN[i] == U.QuantumN[i]);
         
-        tmat = block[i] * U.block[i].transpose();
+        tmat = block[i] * U.block[i].adjoint();
         block[i] = U.block[i] * tmat;
         
         block_size[i] = U.block_size[i];
@@ -291,14 +292,13 @@ void OperatorBlock::Truncate(const OperatorBlock &U)
     ZeroPurification();
 }
 
-
-MatrixXd OperatorBlock::IdentitySign()
+MatrixXcd OperatorBlock::IdentitySign()
 {
-    MatrixXd tmat;
+    MatrixXcd tmat;
     
     for (int i = 0; i < size(); i++) {
         size_t d = block_size[i];
-        MatrixXd tmat2 = MatrixXd::Identity(d, d);
+        MatrixXcd tmat2 = MatrixXcd::Identity(d, d);
         if (QuantumN[i] % 2) {
             tmat2 *= -1;
             tmat.noalias() = MatrixDirectPlus(tmat, tmat2);
@@ -310,9 +310,9 @@ MatrixXd OperatorBlock::IdentitySign()
     return tmat;
 }
 
-MatrixXd OperatorBlock::FullOperator() const
+MatrixXcd OperatorBlock::FullOperator() const
 {
-    MatrixXd tmat;
+    MatrixXcd tmat;
     
     for (int i = 0; i < size(); i++) {
         tmat.noalias() = MatrixDirectPlus(tmat, block[i]);
@@ -341,7 +341,7 @@ void OperatorBlock::UpdateQN(const vector<int> &qn)
     QuantumN = tqn;
 }
 
-void OperatorBlock::UpdateBlock(const MatrixXd &m)
+void OperatorBlock::UpdateBlock(const MatrixXcd &m)
 {
     assert(m.cols() == m.rows() && "Update OperatorBlock: A non-square matrix! ");
     assert((m.cols() == total_d()) && "Update OperatorBlock: Dimensions of matrix and quantum number vector do not agree! ");
@@ -399,7 +399,7 @@ void OperatorBlock::PrintInformation()
 }
 
 
-void SuperBlock::UpdateBlock(const MatrixXd &m)
+void SuperBlock::UpdateBlock(const MatrixXcd &m)
 {
     assert(m.cols() == m.rows() && "Update OperatorBlock: A non-square matrix! ");
     assert((m.cols() == total_d()) && "Update OperatorBlock: Dimensions of matrix and quantum number vector do not agree! ");
@@ -412,25 +412,25 @@ void SuperBlock::UpdateBlock(const MatrixXd &m)
         if (QuantumN[i] == flag_qn + 1) {
             block.push_back(m.block(pos, pos + block_size[i - 1], block_size[i - 1], block_size[i]));
         } else {
-            block.push_back(MatrixXd::Zero(0, 0));
+            block.push_back(MatrixXcd::Zero(0, 0));
         }
         flag_qn = QuantumN[i];
         pos += block_size[i - 1];
     }
     // The last quantum number does not have coupling
-    block.push_back(MatrixXd::Zero(0, 0));
+    block.push_back(MatrixXcd::Zero(0, 0));
 }
 
 void SuperBlock::Truncate(const OperatorBlock &U)
 {
-    MatrixXd tmat;
+    MatrixXcd tmat;
     
     RhoPurification(U);
     for (int i = 0; i < U.size() - 1; i++) {
         block_size[i] = U.block_size[i];
 
         if (U.QuantumN[i] + 1 == U.QuantumN[i + 1]) {
-            tmat = block[i] * U.block[i + 1].transpose();
+            tmat = block[i] * U.block[i + 1].adjoint();
             block[i] = U.block[i] * tmat;
         } else {
             block[i].resize(0, 0);
@@ -443,7 +443,7 @@ void SuperBlock::Truncate(const OperatorBlock &U)
     ZeroPurification();
 }
 
-MatrixXd SuperBlock::FullOperator()
+MatrixXcd SuperBlock::FullOperator()
 {
     size_t total_d = 0;
     
@@ -451,7 +451,7 @@ MatrixXd SuperBlock::FullOperator()
         total_d += block_size[i];
     }
     
-    MatrixXd tmat = MatrixXd::Zero(total_d, total_d);
+    MatrixXcd tmat = MatrixXcd::Zero(total_d, total_d);
     
     int pos = 0;
     for (int i = 0; i < block_size.size(); i++) {
@@ -522,8 +522,8 @@ void WavefunctionBlock::PrintInformation()
     cout << "Norm of this WavefunctionBlock: " << this -> norm() << endl;
     cout << "Wavefunction Blocks: " << endl;
     for (int i = 0; i < size(); i++) {
-        cout << "Block " << i << ", Quantum number: " << QuantumN[i] << endl;
-        cout << block[i] << endl;
+        cout << "Block " << i << ", Quantum number: " << QuantumN[i] << ", Size: " << block[i].rows() << "x" << block[i].cols() <<endl;
+        //cout << block[i] << endl;
     }
 }
 
@@ -534,7 +534,12 @@ double WavefunctionBlock::norm()
         if (block[i].size() == 0) {
             continue;
         }
-        n += block[i].norm() * block[i].norm();
+        for (int j = 0; j < block[i].rows(); j++) {
+            for (int k = 0; k < block[i].cols(); k++) {
+                complex<double> z = block[i](j, k);
+                n += std::norm(z);
+            }
+        }
     }
     return sqrt(n);
 }
@@ -587,8 +592,10 @@ WavefunctionBlock WavefunctionBlock::operator*(double n)
 {
     WavefunctionBlock rval = WavefunctionBlock(*this);
     
+    complex<double> nc = n;
+    
     for (int i = 0; i < this -> size(); i++) {
-        rval.block[i] *= n;
+        rval.block[i] *= nc;
     }
     
     return rval;
@@ -598,8 +605,10 @@ WavefunctionBlock WavefunctionBlock::operator/(double n)
 {
     WavefunctionBlock rval = WavefunctionBlock(*this);
     
+    complex<double> nc = n;
+
     for (int i = 0; i < this -> size(); i++) {
-        rval.block[i] /= n;
+        rval.block[i] /= nc;
     }
     
     return rval;
@@ -630,13 +639,53 @@ WavefunctionBlock& WavefunctionBlock::operator-=(const WavefunctionBlock& rhs)
 
 WavefunctionBlock& WavefunctionBlock::operator*=(double n)
 {
+    complex<double> nc = n;
+    for (int i = 0; i < this -> size(); i++) {
+        block[i] *= nc;
+    }
+    return *this;
+}
+
+WavefunctionBlock& WavefunctionBlock::operator/=(double n)
+{
+    complex<double> nc = n;
+    for (int i = 0; i < this -> size(); i++) {
+        block[i] /= nc;
+    }
+    return *this;
+}
+
+WavefunctionBlock WavefunctionBlock::operator*(complex<double> n)
+{
+    WavefunctionBlock rval = WavefunctionBlock(*this);
+    
+    for (int i = 0; i < this -> size(); i++) {
+        rval.block[i] *= n;
+    }
+    
+    return rval;
+}
+
+WavefunctionBlock WavefunctionBlock::operator/(complex<double> n)
+{
+    WavefunctionBlock rval = WavefunctionBlock(*this);
+    
+    for (int i = 0; i < this -> size(); i++) {
+        rval.block[i] /= n;
+    }
+    
+    return rval;
+}
+
+WavefunctionBlock& WavefunctionBlock::operator*=(complex<double> n)
+{
     for (int i = 0; i < this -> size(); i++) {
         block[i] *= n;
     }
     return *this;
 }
 
-WavefunctionBlock& WavefunctionBlock::operator/=(double n)
+WavefunctionBlock& WavefunctionBlock::operator/=(complex<double> n)
 {
     for (int i = 0; i < this -> size(); i++) {
         block[i] /= n;
@@ -646,14 +695,15 @@ WavefunctionBlock& WavefunctionBlock::operator/=(double n)
 
 void WavefunctionBlock::Truncate(OperatorBlock& U, BlockPosition pos, bool transposed)
 {
-    MatrixXd tmat;
+    MatrixXcd tmat;
     int U_idx;
     for (int i = 0; i < size(); i++) {
         if (pos == BlockPosition::LEFT) {
             U_idx = U.SearchQuantumN(QuantumN[i]);
             assert(U_idx != -1 && "WavefunctionBlock: Corresponding quantum number not found! ");
             if (transposed == true) {
-                tmat = U.block[U_idx].transpose() * block[i];
+                tmat = U.block[U_idx].adjoint() * block[i];
+                //tmat = U.block[U_idx].transpose() * block[i];
             } else {
                 tmat = U.block[U_idx] * block[i];
             }
@@ -661,7 +711,8 @@ void WavefunctionBlock::Truncate(OperatorBlock& U, BlockPosition pos, bool trans
             U_idx = U.SearchQuantumN(quantumN_sector - QuantumN[i]);
             assert(U_idx != -1 && "WavefunctionBlock: Corresponding quantum number not found! ");
             if (transposed == true) {
-                tmat = block[i] * U.block[U_idx].transpose();
+                tmat = block[i] * U.block[U_idx].adjoint();
+                //tmat = block[i] * U.block[U_idx].transpose();
             } else {
                 tmat = block[i] * U.block[U_idx];
             }
@@ -671,7 +722,7 @@ void WavefunctionBlock::Truncate(OperatorBlock& U, BlockPosition pos, bool trans
     // Zero purification
     vector<int>::iterator it_qn = QuantumN.begin();
     
-    for(vector<MatrixXd>::iterator it_block = block.begin(); it_block != block.end(); )
+    for(vector<MatrixXcd>::iterator it_block = block.begin(); it_block != block.end(); )
     {
         if(it_block -> cols() == 0 || it_block -> rows() == 0)
         {
@@ -685,6 +736,8 @@ void WavefunctionBlock::Truncate(OperatorBlock& U, BlockPosition pos, bool trans
         }
     }
 }
+
+
 
 void DMRGBlock::UpdateQN(const vector<int>& qn, int _size)
 {

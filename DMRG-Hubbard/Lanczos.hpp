@@ -25,7 +25,7 @@ WavefunctionBlock InitializeWavefunction(const vector<int>& quantumN_left, const
                                        const vector<size_t>& block_size_left, const vector<size_t>& block_size_right,
                                        int n, WBType wb_type);
 WavefunctionBlock InitializeWavefunction(const WavefunctionBlock& seed, WBType wb_type);
-double InnerProd(WavefunctionBlock &v1, WavefunctionBlock &v2);
+complex<double> InnerProd(WavefunctionBlock &v1, WavefunctionBlock &v2);
 
 
 

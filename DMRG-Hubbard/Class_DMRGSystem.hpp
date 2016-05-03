@@ -11,6 +11,7 @@
 #define Class_DMRGSystem_hpp
 
 #include <iostream>
+#include <fstream>
 #include <vector>
 #include <Eigen/Core>
 #include <chrono>
@@ -22,16 +23,17 @@ using namespace std;
 
 enum class SweepDirection {WR, L2R, R2L};
 enum class FailSolution {RAND, TRUNC};
+enum class tSweepDirection {EVEN, ODD, MEASURE};
 
 class DMRGSystem
 {
 public:
-    MatrixXd c_up0;
-    MatrixXd c_down0;
-    MatrixXd u0;
+    MatrixXcd c_up0;
+    MatrixXcd c_down0;
+    MatrixXcd u0;
     
-    MatrixXd n_up0;
-    MatrixXd n_down0;
+    MatrixXcd n_up0;
+    MatrixXcd n_down0;
     
     OperatorBlock H0;
     
@@ -41,7 +43,7 @@ public:
     WavefunctionBlock psi;
     WavefunctionBlock seed;
     OperatorBlock rho;
-
+    
     double hubbard_u;   // Hubbard U
     
     double energy;
@@ -57,12 +59,21 @@ public:
     int left_size;
     
     SweepDirection state;
+    int sweep;
+    
     FailSolution sol;
     bool fermion;
     
-    chrono::time_point<chrono::system_clock> StartTime;
+    // for saving results to the file
+    ofstream inFile;
+    char filename[100];
+    
+    // for tDMRG
+    double time;
+    MatrixXcd Ueven0, Uodd0;
+
     DMRGSystem(int _nsites, int _max_lanczos_iter, double _trunc_err, double _rel_err, double u);
-   
+    
     void WarmUp(int total_QN, int n_states_to_keep, double truncation_error);
     void Sweep(int total_QN, int n_sweeps, int n_states_to_keep);
     
@@ -72,11 +83,15 @@ public:
     double Truncate(BlockPosition _position, int _max_m, double _trunc_err);
     
     void Measure(bool print_res);
-    OperatorBlock BuildDiagOperator(const MatrixXd& op0, int site1, int site2, BlockPosition pos);
-    //void BuildOperator_n(BlockPosition pos, int site);
-    //void BuildOperator_c(BlockPosition pos, int site);
-    //SuperBlock BuildLocalOperator_splus(BlockPosition pos, int site);
-    //OperatorBlock BuildNonlocalOperator_sz(BlockPosition pos, int site1, int site2);
+    OperatorBlock BuildDiagOperator(const MatrixXcd& op0, int site1, int site2, BlockPosition pos);
+    
+    
+    // for tDMRG
+    void TimeRevolution(int total_QN, double t_max, double t_step, int n_states_to_keep);
+    void TimeSweep(int total_QN, int n_states_to_keep, tSweepDirection tdir);
+    MatrixXcd BondExp(double tstep);
+    MatrixXcd BondU(int bond_idx, tSweepDirection tdir);
+    void TimeStep(int bond_idx, tSweepDirection tdir);
 };
 
 double MeasureLocalDiag(const OperatorBlock& n, const WavefunctionBlock& psi, BlockPosition pos);

@@ -22,15 +22,15 @@ enum class SortOrder {ASCENDING, DESCENDING};
 
 template <typename Type> void PrintVector(Type &vec);
 
-MatrixXd MatrixDirectPlus(const MatrixXd &m1, const MatrixXd &m2);
-void MatrixReorder(MatrixXd &m, vector<int> &vec_idx);
+MatrixXcd MatrixDirectPlus(const MatrixXcd &m1, const MatrixXcd &m2);
+void MatrixReorder(MatrixXcd &m, vector<int> &vec_idx);
 
 template <typename Type> vector<int> SortIndex(Type &vec, SortOrder so);
 
 class OperatorBlock
 {
 public:
-    vector<MatrixXd> block;
+    vector<MatrixXcd> block;
     vector<int> QuantumN;
     // Only for square blocks
     vector<size_t> block_size;
@@ -49,10 +49,10 @@ public:
     void Truncate(const OperatorBlock &U);
     void ZeroPurification();
     void UpdateQN(const vector<int> &qn);
-    void UpdateBlock(const MatrixXd &m);
+    void UpdateBlock(const MatrixXcd &m);
     int SearchQuantumN(int n) const;
 
-    MatrixXd FullOperator() const;
+    MatrixXcd FullOperator() const;
     vector<int> FullQuantumN() const;
     
     // Only for square blocks
@@ -66,7 +66,7 @@ public:
     }
     int BlockFirstIdx(int idx);
     int BlockLastIdx(int idx);
-    MatrixXd IdentitySign();
+    MatrixXcd IdentitySign();
     
     // For debug
     void CheckConsistency();
@@ -82,10 +82,10 @@ int SearchBlockIndex(const vector<size_t>& block_size, int idx);
 class SuperBlock : public OperatorBlock
 {
 public:
-    void UpdateBlock(const MatrixXd &m);
+    void UpdateBlock(const MatrixXcd &m);
     void Truncate(const OperatorBlock &U);
     
-    MatrixXd FullOperator();
+    MatrixXcd FullOperator();
 
     void CheckConsistency();
     void PrintInformation();
@@ -95,7 +95,7 @@ class WavefunctionBlock
 {
 public:
     int quantumN_sector;
-    vector<MatrixXd> block;
+    vector<MatrixXcd> block;
     vector<int> QuantumN;
     
     WavefunctionBlock();
@@ -124,6 +124,12 @@ public:
     WavefunctionBlock& operator-=(const WavefunctionBlock& rhs);
     WavefunctionBlock& operator*=(double n);
     WavefunctionBlock& operator/=(double n);
+    
+    WavefunctionBlock operator*(complex<double> n);
+    WavefunctionBlock operator/(complex<double> n);
+    WavefunctionBlock& operator*=(complex<double> n);
+    WavefunctionBlock& operator/=(complex<double> n);
+
     
     void Truncate(OperatorBlock& U, BlockPosition pos, bool transposed);
 };
