@@ -85,12 +85,11 @@ public:
     void Measure(bool print_res);
     OperatorBlock BuildDiagOperator(const MatrixXcd& op0, int site1, int site2, BlockPosition pos);
     
-    
+    double PotentialUp();
     // for tDMRG
     void TimeRevolution(int total_QN, double t_max, double t_step, int n_states_to_keep);
     void TimeSweep(int total_QN, int n_states_to_keep, tSweepDirection tdir);
     MatrixXcd BondExp(double tstep);
-    MatrixXcd BondU(int bond_idx, tSweepDirection tdir);
     void TimeStep(int bond_idx, tSweepDirection tdir);
 };
 

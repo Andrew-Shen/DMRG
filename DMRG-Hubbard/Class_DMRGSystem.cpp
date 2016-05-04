@@ -87,6 +87,13 @@ DMRGSystem::DMRGSystem(int _nsites, int _max_lanczos_iter, double _trunc_err, do
     BlockL[0].c_down[0].UpdateBlock(c_down0);
     BlockR[0].c_down[0] = BlockL[0].c_down[0];
     
+    //BlockL[0].n_up[0].UpdateQN(tsize);
+    //BlockL[0].n_up[0].UpdateBlock(n_up0);
+    //BlockR[0].n_up[0] = BlockL[0].n_up[0];
+    //BlockL[0].n_down[0].UpdateQN(tsize);
+    //BlockL[0].n_down[0].UpdateBlock(n_down0);
+    //BlockR[0].n_down[0] = BlockL[0].n_down[0];
+    
     time = 0;
     
     chrono::time_point<chrono::system_clock> StartTime = chrono::system_clock::now();
@@ -117,16 +124,9 @@ DMRGSystem::DMRGSystem(int _nsites, int _max_lanczos_iter, double _trunc_err, do
     }
     
     inFile << "t = 1.0, U = " << hubbard_u << endl;
-    inFile << "Site = " << nsites << ", Particles = " << psi.quantumN_sector << endl;
-    inFile << "DMRG Parameters: " << endl;
-    inFile << "Truncation Err = " << trunc_err << ", Lancozs Err = " << rel_err << ", ";
-    if (sol == FailSolution::TRUNC) {
-        inFile << "Omit basis" << endl;
-    } else {
-        inFile << "Random seed" << endl;
-    }
-    inFile << endl;
     inFile.close();
+    
+    
 
 }
 
@@ -164,6 +164,18 @@ void DMRGSystem::Sweep(int total_QN, int n_sweeps, int n_states_to_keep)
     int first_iter = 0.5 * nsites;
     left_size = first_iter - 1;
     right_size = nsites - 2 - left_size;
+    
+    inFile.open(filename, ios::app);
+    inFile << "Site = " << nsites << ", Particles = " << total_QN << endl;
+    inFile << "DMRG Parameters: " << endl;
+    inFile << "Truncation Err = " << trunc_err << ", Lancozs Err = " << rel_err << ", ";
+    if (sol == FailSolution::TRUNC) {
+        inFile << "Omit basis" << endl;
+    } else {
+        inFile << "Random seed" << endl;
+    }
+    inFile << endl;
+    inFile.close();
 
     state = SweepDirection::L2R;
     while (sweep <= n_sweeps) {
@@ -328,7 +340,7 @@ void DMRGSystem::BuildSeed(int n)
                 
                 for (int j = 0; j < psi.block[i].rows(); j++) {
                     for (int k = 0; k < psi.block[i].cols(); k++) {
-                        int idx_r = trans_idx_r.at(BlockFirstIndex(block_size_r, block_idx_r) + k);
+                        int idx_r = trans_idx_r[BlockFirstIndex(block_size_r, block_idx_r) + k];
                         
                         int idx_right = idx_r % (int)total_d_right;
                         
@@ -400,6 +412,22 @@ void DMRGSystem::BuildSeed(int n)
     BlockR[right_size].UpdateQN(unsqueezed_quantumN_right, right_size);
 }
 
+double DMRGSystem::PotentialUp()
+{
+    int d_to_center = abs(left_size - 0.5 * nsites + 1);
+    
+    // Gaussian potential
+    double strength = -1.0;
+    double sigma = 2.0;
+    return strength * exp(- d_to_center * d_to_center / (2 * sigma * sigma));
+    
+    //if (d_to_center < 5) {
+    //    return 0.07 * d_to_center * d_to_center - 1.7;
+    //} else {
+    //    return 0;
+    //}
+}
+
 void DMRGSystem::BuildBlock(BlockPosition _position)
 {
     if (_position == BlockPosition::LEFT) {
@@ -425,6 +453,10 @@ void DMRGSystem::BuildBlock(BlockPosition _position)
         kroneckerProduct(I_left, c_down0.adjoint()) * kroneckerProduct(c_downL, I_sign) +
         kroneckerProduct(c_downL.adjoint(), I_sign) * kroneckerProduct(I_left, c_down0);
         
+        if (state != SweepDirection::WR && time == 0) {
+            H += PotentialUp() * kroneckerProduct(I_left, n_up0);
+        }
+        
         MatrixReorder(H, BlockL[left_size].idx);
         BlockL[left_size].H.UpdateBlock(H);
 
@@ -435,6 +467,8 @@ void DMRGSystem::BuildBlock(BlockPosition _position)
         c_downL = kroneckerProduct(I_left, c_down0);
         MatrixReorder(c_downL, BlockL[left_size].idx);
         BlockL[left_size].c_down[left_size].UpdateBlock(c_downL);
+        
+        
     } else {
         MatrixXcd HR = BlockR[right_size - 1].H.FullOperator();
         MatrixXcd c_upR = BlockR[right_size - 1].c_up[right_size - 1].FullOperator();
@@ -451,12 +485,16 @@ void DMRGSystem::BuildBlock(BlockPosition _position)
         } else {
             I_sign = I_right;
         }
-
+        
         MatrixXcd H = kroneckerProduct(I_site, HR) + kroneckerProduct(u0, I_right) +
         kroneckerProduct(c_up0.adjoint(), I_sign) * kroneckerProduct(I_site, c_upR) +
         kroneckerProduct(I_site, c_upR.adjoint()) * kroneckerProduct(c_up0, I_sign) +
         kroneckerProduct(c_down0.adjoint(), I_sign) * kroneckerProduct(I_site, c_downR) +
         kroneckerProduct(I_site, c_downR.adjoint()) * kroneckerProduct(c_down0, I_sign);
+        
+        if (state != SweepDirection::WR && time == 0) {
+            H += PotentialUp() * kroneckerProduct(n_up0, I_right);
+        }
         
         MatrixReorder(H, BlockR[right_size].idx);
         BlockR[right_size].H.UpdateBlock(H);
@@ -516,8 +554,10 @@ double DMRGSystem::Truncate(BlockPosition _position, int _max_m, double _trunc_e
     for (int i = 0; i < n_blocks; i++) {
         // The minus sign is for the descending order of the eigenvalue.
         rsolver.compute(-rho.block[i]);
-        if (rsolver.info() != Success) abort();
-        
+        if (rsolver.info() != Success) {
+            cout << rho.block[i] << endl;
+            abort();
+        }
         tvec.resize(rsolver.eigenvalues().size());
         VectorXd::Map(&tvec[0], rsolver.eigenvalues().size()) = -rsolver.eigenvalues();
         rho_eig_t.insert(rho_eig_t.end(), tvec.begin(), tvec.end());
@@ -922,7 +962,7 @@ void DMRGSystem::TimeRevolution(int total_QN, double t_max, double t_step, int n
     Uodd0 = BondExp(t_step);
     time += t_step;
     
-    while (time < t_max) {
+    while (time <= t_max) {
         TimeSweep(total_QN, n_states_to_keep, tSweepDirection::EVEN);
         TimeSweep(total_QN, n_states_to_keep, tSweepDirection::ODD);
         TimeSweep(total_QN, n_states_to_keep, tSweepDirection::EVEN);
@@ -946,7 +986,24 @@ void DMRGSystem::TimeSweep(int total_QN, int n_states_to_keep, tSweepDirection t
     
     while (1) {
         BuildSeed(total_QN);
-        cout << "=== Time Revolution at t = " << time << " ===" << endl;
+        cout << "=== Time Revolution at t = " << time;
+        switch (tdir) {
+            case tSweepDirection::EVEN:
+                cout << ", Even Bond Sweep ===" << endl;
+                break;
+                
+            case tSweepDirection::ODD:
+                cout << ", Odd Bond Sweep ===" << endl;
+                break;
+                
+            case tSweepDirection::MEASURE:
+                cout << ", Measurement Sweep ===" << endl;
+                break;
+                
+            default:
+                break;
+        }
+        
         cout << "Block Size: Left = " << left_size << ", Right = " << right_size;
         //cout << seed.norm() << endl;
         BuildBlock(BlockPosition::LEFT);
@@ -956,19 +1013,19 @@ void DMRGSystem::TimeSweep(int total_QN, int n_states_to_keep, tSweepDirection t
         
         if (tdir == tSweepDirection::EVEN) {
             if (right_size == 1) {
-                cout << ". Bond Index: " << nsites - 2 << endl;
+                cout << ", Bond Index: " << nsites - 2 << endl;
                 TimeStep(nsites - 2, tdir);
             } else {
                 if (left_size == 1) {
-                    cout << ". Bond Index: " << 0 << endl;
+                    cout << ", Bond Index: " << 0 << endl;
                     TimeStep(0, tdir);
                 } else {
-                    cout << ". Bond Index: " << left_size << endl;
+                    cout << ", Bond Index: " << left_size << endl;
                     TimeStep(left_size, tdir);
                 }
             }
         } else {
-            cout << ". Bond Index: " << left_size << endl;
+            cout << ", Bond Index: " << left_size << endl;
             TimeStep(left_size, tdir);
         }
         
@@ -976,7 +1033,7 @@ void DMRGSystem::TimeSweep(int total_QN, int n_states_to_keep, tSweepDirection t
             Truncate(BlockPosition::LEFT, n_states_to_keep, trunc_err);
             
             if (left_size == right_size && tdir == tSweepDirection::MEASURE) {
-                Measure(true);
+                Measure(false);
             }
             
             if (left_size == nsites - 3) {
@@ -996,48 +1053,49 @@ MatrixXcd DMRGSystem::BondExp(double tstep)
 {
     MatrixXcd I_site = MatrixXcd::Identity(d_per_site, d_per_site);
     
-    //MatrixXcd H = kroneckerProduct(I_site, I_site);
     MatrixXcd H = -1i * tstep * (kroneckerProduct(c_up0.adjoint(), c_up0) + kroneckerProduct(c_down0.adjoint(), c_down0) + kroneckerProduct(c_up0, c_up0.adjoint()) + kroneckerProduct(c_down0, c_down0.adjoint()) + kroneckerProduct(I_site, u0) + kroneckerProduct(u0, I_site));
     
     return H.exp();
 }
 
-MatrixXcd DMRGSystem::BondU(int bond_idx, tSweepDirection tdir)
+void DMRGSystem::TimeStep(int bond_idx, tSweepDirection tdir)
 {
+    MatrixXcd U;
+    psi = InitializeWavefunction(seed, WBType::ZERO);
     switch (tdir) {
         case tSweepDirection::EVEN:
             if (bond_idx % 2) {
-                return MatrixXcd::Identity(d_per_site * d_per_site, d_per_site * d_per_site);
+                psi = seed;
+                return;
             } else {
-                return Ueven0;
+                U = Ueven0;
             }
             break;
             
         case tSweepDirection::ODD:
             if (bond_idx % 2) {
-                return Uodd0;
+                U = Uodd0;
             } else {
-                return MatrixXcd::Identity(d_per_site * d_per_site, d_per_site * d_per_site);
+                psi = seed;
+                return;
             }
+            break;
             
         case tSweepDirection::MEASURE:
-            return MatrixXcd::Identity(d_per_site * d_per_site, d_per_site * d_per_site);
+            psi = seed;
+            return;
+            break;
             
         default:
             break;
     }
-}
-
-void DMRGSystem::TimeStep(int bond_idx, tSweepDirection tdir)
-{
-    psi = InitializeWavefunction(seed, WBType::ZERO);
     
     if (bond_idx != 0 && bond_idx != nsites - 2) {
         // A note on the notation:
         // Variables with name xxx_left or xxx_right is for Block left_size or right_size
         // Variables with name xxx_l or xxx_r is for Block left_size - 1 or right_size - 1
         // Variables with name quantumN_xxx is a vector, with name qn_xxx is an element in the vector
-        assert(bond_idx == left_size);
+        //assert(bond_idx == left_size);
         
         size_t total_d_l = BlockL[left_size - 1].H.total_d();
         size_t total_d_r = BlockR[right_size - 1].H.total_d();
@@ -1054,20 +1112,20 @@ void DMRGSystem::TimeStep(int bond_idx, tSweepDirection tdir)
             for (int j = 0; j < seed.block[i].rows(); j++) {
                 for (int k = 0; k < seed.block[i].cols(); k++) {
                     //cout << j << "," << k << endl;
-                    int idx_left = BlockL[left_size].idx.at(BlockFirstIndex(BlockL[left_size].H.block_size, block_idx_left) + j);
-                    int idx_right = BlockR[right_size].idx.at(BlockFirstIndex(BlockR[right_size].H.block_size, block_idx_right) + k);
+                    int idx_left = BlockL[left_size].idx[BlockFirstIndex(BlockL[left_size].H.block_size, block_idx_left) + j];
+                    int idx_right = BlockR[right_size].idx[BlockFirstIndex(BlockR[right_size].H.block_size, block_idx_right) + k];
                     
                     int idx_site_left = idx_left % d_per_site;
                     double idx_l = (idx_left - idx_site_left) / d_per_site;
-                    assert(idx_l >= 0 && idx_l < total_d_l && floor(idx_l) == idx_l);
+                    //assert(idx_l >= 0 && idx_l < total_d_l && floor(idx_l) == idx_l);
                     int idx_r = idx_right % total_d_r;
                     double idx_site_right = (idx_right - idx_r) / total_d_r;
-                    assert(idx_site_right >= 0 && idx_site_right < d_per_site && floor(idx_site_right) == idx_site_right);
+                    //assert(idx_site_right >= 0 && idx_site_right < d_per_site && floor(idx_site_right) == idx_site_right);
                     
                     int tpsi_row = d_per_site * idx_site_left + idx_site_right;
-                    assert(tpsi_row >= 0 && tpsi_row < d_per_site * d_per_site);
+                    //assert(tpsi_row >= 0 && tpsi_row < d_per_site * d_per_site);
                     int tpsi_col = total_d_r * idx_l + idx_r;
-                    assert(tpsi_col >= 0 && tpsi_col < total_d_l * total_d_r);
+                    //assert(tpsi_col >= 0 && tpsi_col < total_d_l * total_d_r);
                     
                     //flag1++;
                     tpsi(tpsi_row, tpsi_col) = seed.block[i](j, k);
@@ -1075,16 +1133,16 @@ void DMRGSystem::TimeStep(int bond_idx, tSweepDirection tdir)
             }
         }
         
-        MatrixXcd tmat = BondU(bond_idx, tdir) * tpsi;
+        MatrixXcd tmat = U * tpsi;
         
         for (int i = 0; i < tmat.rows(); i++) {
             for (int j = 0; j < tmat.cols(); j++) {
                 int idx_site_right = i % d_per_site;
                 double idx_site_left = (i - idx_site_right) / d_per_site;
-                assert(idx_site_left >= 0 && idx_site_left < d_per_site && floor(idx_site_left) == idx_site_left);
+                //assert(idx_site_left >= 0 && idx_site_left < d_per_site && floor(idx_site_left) == idx_site_left);
                 int idx_r = j % total_d_r;
                 double idx_l = (j - idx_r) / total_d_r;
-                assert(idx_l >= 0 && idx_l < total_d_l && floor(idx_l) == idx_l);
+                //assert(idx_l >= 0 && idx_l < total_d_l && floor(idx_l) == idx_l);
                 
                 int idx_left = SearchIndex(BlockL[left_size].idx, d_per_site * idx_l + idx_site_left);
                 int idx_right = SearchIndex(BlockR[right_size].idx, (int)total_d_r * idx_site_right + idx_r);
@@ -1113,7 +1171,7 @@ void DMRGSystem::TimeStep(int bond_idx, tSweepDirection tdir)
         vector<int> trans_idx = SortIndex(quantumN, SortOrder::ASCENDING);
         
         topt.UpdateQN(quantumN);
-        MatrixXcd tmat = BondU(bond_idx, tdir);
+        MatrixXcd tmat = U;
 
         MatrixReorder(tmat, trans_idx);
         topt.UpdateBlock(tmat);
@@ -1121,13 +1179,13 @@ void DMRGSystem::TimeStep(int bond_idx, tSweepDirection tdir)
         if (bond_idx == 0) {
             for (int i = 0; i < psi.size(); i++) {
                 int topt_idx = topt.SearchQuantumN(psi.QuantumN[i]);
-                assert(topt_idx != -1);
+                //assert(topt_idx != -1);
                 psi.block[i] = topt.block[topt_idx] * seed.block[i];
             }
         } else {
             for (int i = 0; i < psi.size(); i++) {
                 int topt_idx = topt.SearchQuantumN(psi.quantumN_sector - psi.QuantumN[i]);
-                assert(topt_idx != -1);
+                //assert(topt_idx != -1);
                 psi.block[i] =  seed.block[i] * topt.block[topt_idx];
             }
         }
