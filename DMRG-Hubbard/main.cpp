@@ -27,21 +27,21 @@ int main()
     double rel_err, truncation_error;
 
     // DMRG Parameters
-    nsites = 20;
-    n_sweeps = 10;
+    nsites = 72;
+    n_sweeps = 6;
 
     n_states_to_keep = 500;
     max_lanczos_iter = 500;
-    truncation_error = 1e-7;
-    rel_err = 1e-8;
+    truncation_error = 1e-5;
+    rel_err = 1e-6;
     
     // Model Paramater
-    hubbard_u = 1;
-    particles = nsites - 4;
+    hubbard_u = 10;
+    particles = 57 ;
         
     DMRGSystem S(nsites, max_lanczos_iter, truncation_error, rel_err, hubbard_u);
     
-    S.WarmUp(particles, n_states_to_keep, truncation_error * 10);
+    S.WarmUp(particles, n_states_to_keep, truncation_error * 5);
 
     S.Sweep(particles, n_sweeps, n_states_to_keep);
 

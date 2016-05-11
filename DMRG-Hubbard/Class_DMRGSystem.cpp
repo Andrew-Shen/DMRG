@@ -36,6 +36,7 @@ DMRGSystem::DMRGSystem(int _nsites, int _max_lanczos_iter, double _trunc_err, do
     left_size = 0;
     right_size = 0;
     state = SweepDirection::WR;
+    sweep = 0;
     nsites = _nsites;
     
     BlockL.resize(nsites);
@@ -85,7 +86,7 @@ DMRGSystem::DMRGSystem(int _nsites, int _max_lanczos_iter, double _trunc_err, do
     BlockR[0].c_down[0] = BlockL[0].c_down[0];
     
 
-    StartTime = chrono::system_clock::now();
+    chrono::time_point<chrono::system_clock> StartTime = chrono::system_clock::now();
     time_t start_t = chrono::system_clock::to_time_t(StartTime);
     char mbstr[100];
     strftime(mbstr, sizeof(mbstr), "%c", localtime(&start_t));
@@ -102,6 +103,19 @@ DMRGSystem::DMRGSystem(int _nsites, int _max_lanczos_iter, double _trunc_err, do
     } else {
         cout << "Boson" << endl;
     }
+    
+    strftime(filename, sizeof(filename), "%F %H%M%S.txt", localtime(&start_t));
+    inFile.open(filename, ios::trunc);
+    inFile << "#Model Parameters: " << endl;
+    if (fermion == true) {
+        inFile << "#Fermion, ";
+    } else {
+        inFile << "#Boson, ";
+    }
+    
+    inFile << "t = 1.0, U = " << hubbard_u << endl;
+    inFile.close();
+
 }
 
 void DMRGSystem::WarmUp(int total_QN, int n_states_to_keep, double truncation_error)
@@ -135,7 +149,7 @@ void DMRGSystem::Sweep(int total_QN, int n_sweeps, int n_states_to_keep)
     right_size = nsites - 2 - left_size;
     
     state = SweepDirection::L2R;
-    for (int sweep = 0; sweep <= n_sweeps; ) {
+    for (; sweep <= n_sweeps; ) {
         if (state == SweepDirection::L2R) {
             cout << "=== Sweep " << sweep << ": Left-to-right Iteration " << " ===" << endl;
         } else {
@@ -151,7 +165,7 @@ void DMRGSystem::Sweep(int total_QN, int n_sweeps, int n_states_to_keep)
         GroundState(nsites);
         
         if (state == SweepDirection::L2R) {
-            if (left_size == right_size && sweep > 0) {
+            if (left_size == right_size && sweep == n_sweeps) {
                 Measure(false);
             }
             
@@ -492,6 +506,12 @@ double DMRGSystem::Truncate(BlockPosition _position, int _max_m, double _trunc_e
 
     eig_idx = SortIndex(rho_eig_t, SortOrder::DESCENDING);
     
+    double ee = 0;
+    for (int i = 0; i < total_d; i++) {
+        ee += rho_eig_t[i] * rho_eig_t[i];
+    }
+    cout << "Quantum Purity: " << ee << endl;
+    
     error = 0;
 
     int _m = 0;
@@ -572,37 +592,15 @@ double DMRGSystem::Truncate(BlockPosition _position, int _max_m, double _trunc_e
 
 void DMRGSystem::Measure(bool print_res)
 {
-    ofstream inFile;
-
-    time_t start_t = chrono::system_clock::to_time_t(StartTime);
-    char mbstr[100];
-    strftime(mbstr, sizeof(mbstr), "%F %H%M%S.txt", localtime(&start_t));
-    inFile.open(mbstr, ios::trunc);
-    
-    inFile << "Model Parameters: " << endl;
-    if (fermion == true) {
-        inFile << "Fermion, ";
-    } else {
-        inFile << "Boson, ";
-    }
-
-    inFile << "t = 1.0, U = " << hubbard_u << endl;
-    inFile << "Site = " << nsites << ", Particles = " << psi.quantumN_sector << endl;
-    inFile << "DMRG Parameters: " << endl;
-    inFile << "Truncation Err = " << trunc_err << ", Lancozs Err = " << rel_err << ", ";
-    if (sol == FailSolution::TRUNC) {
-        inFile << "Omit basis" << endl;
-    } else {
-        inFile << "Random seed" << endl;
-    }
-    inFile << endl;
+    inFile.open(filename, ios::app);
+    inFile << "#Measurement at Sweep n = " << sweep << endl;
     
     cout << "=== Measurement: Building Operators ===" << endl;
     vector<OperatorBlock> n_upL(left_size + 1);
     vector<OperatorBlock> n_downL(left_size + 1);
     vector<OperatorBlock> n_upR(right_size + 1);
     vector<OperatorBlock> n_downR(right_size + 1);
-
+    
     for (int i = 0; i <= left_size; i++) {
         n_upL[i] = BuildDiagOperator(n_up0, i, 0, BlockPosition::LEFT);
         n_downL[i] = BuildDiagOperator(n_down0, i, 0, BlockPosition::LEFT);
@@ -612,8 +610,24 @@ void DMRGSystem::Measure(bool print_res)
         n_downR[i] = BuildDiagOperator(n_down0, i, 0, BlockPosition::RIGHT);
     }
     
+    vector<OperatorBlock> nnL(left_size + 1);
+    vector<OperatorBlock> szszL(left_size + 1);
+    vector<OperatorBlock> nnR(right_size + 1);
+    vector<OperatorBlock> szszR(right_size + 1);
+    
+    MatrixXd nn0 = (n_up0 + n_down0) * (n_up0 + n_down0);
+    MatrixXd szsz0 = 0.25 * (n_up0 - n_down0) * (n_up0 - n_down0);
+    for (int i = 0; i <= left_size; i++) {
+        nnL[i] = BuildDiagOperator(nn0, i, 0, BlockPosition::LEFT);
+        szszL[i] = BuildDiagOperator(szsz0, i, 0, BlockPosition::LEFT);
+    }
+    for (int i = 0; i <= right_size; i++) {
+        nnR[i] = BuildDiagOperator(nn0, i, 0, BlockPosition::RIGHT);
+        szszR[i] = BuildDiagOperator(szsz0, i, 0, BlockPosition::RIGHT);
+    }
+    
     cout << "=== Measurement: Local ===" << endl;
-    inFile << "Local Measurement: site_i, <n(i)>, <Sz(i)>" << endl;
+    inFile << "#Local Measurement: site_i, <n(i)>, <Sz(i)>" << endl;
     for (int i = 0; i <= left_size; i++) {
         double n_up = MeasureLocalDiag(n_upL[i], psi, BlockPosition::LEFT);
         double n_down = MeasureLocalDiag(n_downL[i], psi, BlockPosition::LEFT);
@@ -633,8 +647,59 @@ void DMRGSystem::Measure(bool print_res)
     }
     inFile << endl;
     
+    cout << "=== Measurement: n Correlation ===" << endl;
+    inFile << "#Correlation Measurement: site_i, site_j, <n(i)n(j)>" << endl;
+    cout << "----- Inter-block Measurement -----" << endl;
+    for (int i = 0; i <= left_size; i++) {
+        for (int j = right_size; j >= 0; j--) {
+            double n = MeasureTwoDiag(n_upL[i], n_upR[j], psi) + MeasureTwoDiag(n_downL[i], n_downR[j], psi) +
+            MeasureTwoDiag(n_upL[i], n_downR[j], psi) + MeasureTwoDiag(n_downL[i], n_upR[j], psi);
+            if (print_res == true) {
+                cout << "n(" << i << "," << nsites - j - 1 << ") = " << n << endl;
+            }
+            inFile << i << "\t" << nsites - j - 1 << "\t" << n << endl;
+        }
+    }
+    cout << "----- Intra-block Measurement -----" << endl;
+    MatrixXd n0 = n_up0 + n_down0;
+    for (int i = 0; i < left_size; i++) {
+        for (int j = i + 1; j <= left_size; j++) {
+            OperatorBlock opt = BuildDiagOperator(n0, i, j, BlockPosition::LEFT);
+            double n = MeasureLocalDiag(opt, psi, BlockPosition::LEFT);
+            if (print_res == true) {
+                cout << "n(" << i << "," <<  j << ") = " << n << endl;
+            }
+            inFile << i << "\t" << j << "\t" << n << endl;
+        }
+    }
+    for (int i = 0; i <= left_size; i++) {
+        double nn = MeasureLocalDiag(nnL[i], psi, BlockPosition::LEFT);
+        if (print_res == true) {
+            cout << "n(" << i << "," <<  i << ") = " << nn << endl;
+        }
+        inFile << i << "\t" << i << "\t" << nn << endl;
+    }
+    for (int i = right_size; i >= 0; i--) {
+        for (int j = right_size; j > i; j--) {
+            OperatorBlock opt = BuildDiagOperator(n0, i, j, BlockPosition::RIGHT);
+            double n = MeasureLocalDiag(opt, psi, BlockPosition::RIGHT);
+            if (print_res == true) {
+                cout << "n(" << nsites - i - 1 << "," <<  nsites - j - 1 << ") = " << n << endl;
+            }
+            inFile << nsites - i - 1 << "\t" << nsites - j - 1 << "\t" << n << endl;
+        }
+    }
+    for (int i = right_size; i >= 0; i--) {
+        double nn = MeasureLocalDiag(nnR[i], psi, BlockPosition::RIGHT);
+        if (print_res == true) {
+            cout << "n(" << nsites - i - 1 << "," <<  nsites - i - 1 << ") = " << nn << endl;
+        }
+        inFile << nsites - i - 1 << "\t" << nsites - i - 1 << "\t" << nn << endl;
+    }
+
+    
     cout << "=== Measurement: Sz Correlation ===" << endl;
-    inFile << "Correlation Measurement: site_i, site_j, <Sz(i)Sz(j)>" << endl;
+    inFile << "#Correlation Measurement: site_i, site_j, <Sz(i)Sz(j)>" << endl;
     cout << "----- Inter-block Measurement -----" << endl;
     for (int i = 0; i <= left_size; i++) {
         for (int j = right_size; j >= 0; j--) {
@@ -659,6 +724,13 @@ void DMRGSystem::Measure(bool print_res)
             inFile << i << "\t" << j << "\t" << sz << endl;
         }
     }
+    for (int i = 0; i <= left_size; i++) {
+        double nn = MeasureLocalDiag(szszL[i], psi, BlockPosition::LEFT);
+        if (print_res == true) {
+            cout << "Sz(" << i << "," <<  i << ") = " << nn << endl;
+        }
+        inFile << i << "\t" << i << "\t" << nn << endl;
+    }
     for (int i = right_size; i >= 0; i--) {
         for (int j = right_size; j > i; j--) {
             OperatorBlock opt = BuildDiagOperator(sz0, i, j, BlockPosition::RIGHT);
@@ -669,18 +741,26 @@ void DMRGSystem::Measure(bool print_res)
             inFile << nsites - i - 1 << "\t" << nsites - j - 1 << "\t" << sz << endl;
         }
     }
-    inFile << endl;
-     
-    /*
-    cout << "=== Measurement: S+S- Correlation ===" << endl;
-    cout << "----- Inter-block Measurement -----" << endl;
-    for (int i = 0; i <= left_size; i++) {
-        SuperBlock splus_l = BuildLocalOperator_splus(BlockPosition::LEFT, i);
-        for (int j = right_size; j >= 0; j--) {
-     
-            cout << "S+(" << i << ")S-(" << nsites - j - 1 << ") = " << sz << endl;
+    for (int i = right_size; i >= 0; i--) {
+        double nn = MeasureLocalDiag(szszR[i], psi, BlockPosition::RIGHT);
+        if (print_res == true) {
+            cout << "Sz(" << nsites - i - 1 << "," <<  nsites - i - 1 << ") = " << nn << endl;
         }
+        inFile << nsites - i - 1 << "\t" << nsites - i - 1 << "\t" << nn << endl;
     }
+    
+    inFile << endl;
+    
+    /*
+     cout << "=== Measurement: S+S- Correlation ===" << endl;
+     cout << "----- Inter-block Measurement -----" << endl;
+     for (int i = 0; i <= left_size; i++) {
+     SuperBlock splus_l = BuildLocalOperator_splus(BlockPosition::LEFT, i);
+     for (int j = right_size; j >= 0; j--) {
+     
+     cout << "S+(" << i << ")S-(" << nsites - j - 1 << ") = " << sz << endl;
+     }
+     }
      */
     
     inFile.close();

@@ -45,6 +45,7 @@ public:
         return QuantumN.size();
     }
     
+    // rho_puri and zero_puri can be implemeneted in the same function
     void RhoPurification(const OperatorBlock &rho);
     void Truncate(const OperatorBlock &U);
     void ZeroPurification();

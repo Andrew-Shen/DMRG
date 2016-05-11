@@ -11,6 +11,7 @@
 #define Class_DMRGSystem_hpp
 
 #include <iostream>
+#include <fstream>
 #include <vector>
 #include <Eigen/Core>
 #include <chrono>
@@ -57,8 +58,14 @@ public:
     int left_size;
     
     SweepDirection state;
+    int sweep;
+    
     FailSolution sol;
     bool fermion;
+    
+    // for saving results to the file
+    ofstream inFile;
+    char filename[100];
     
     chrono::time_point<chrono::system_clock> StartTime;
     DMRGSystem(int _nsites, int _max_lanczos_iter, double _trunc_err, double _rel_err, double u);
